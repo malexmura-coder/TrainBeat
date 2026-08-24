@@ -1,0 +1,34 @@
+# build output
+build/
+app/build/
+.gradle/
+.kotlin/
+.cxx/
+captures/
+
+# local to this machine
+local.properties
+.idea/
+*.iml
+.DS_Store
+
+# not ours to distribute, and too large for GitHub
+soundfonts/
+*.sf2
+*.SF2
+*.sf3
+
+# bench material and its renders
+tools/*.jar
+tools/out/
+tools/midi/
+_to_delete/
+_stage/
+_stage_test/
+
+# bench inputs: they point at folders on this Mac
+scan-folder.txt
+render-file.txt
+
+# scratch
+*.log

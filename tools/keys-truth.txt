@@ -1,0 +1,22 @@
+# Tonalita' di riferimento, una riga per file.
+# Precompilate dai nomi: CORREGGI quelle sbagliate e rilancia.
+# Formato:  nomefile = Am        (usa i diesis: C# non Db)
+# Lascia vuoto dopo l'uguale per escludere un file dal conteggio.
+
+blues_Am.wav = Am
+blues_C_094_1.wav = C
+blues_C_094_2.wav = C
+blues_E.wav = E
+bossa_Am_125bpm.wav = Am
+funky_F#m.wav = F#m
+funky_G.wav = G
+fusion_Am_Gm_100bpm.wav = Am
+fusion_E_140bpm.wav = E
+jazz_A_180bpm.wav = A
+metal_Am_150bpm_B.wav = Am
+metal_Dm_130bpm.wav = Dm
+metal_Dm_150bpm_A.wav = Dm
+pop_C.wav = C
+pop_E.wav = E
+rock_A_120bpm.wav = A
+rock_Am.wav = Am

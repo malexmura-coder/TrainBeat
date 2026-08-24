@@ -22,9 +22,8 @@ soundfonts/
 tools/*.jar
 tools/out/
 tools/midi/
-_to_delete/
-_stage/
-_stage_test/
+_to_delete*
+_stage*
 
 # bench inputs: they point at folders on this Mac
 scan-folder.txt

@@ -1,0 +1,9 @@
+First release.
+
+Gapless looping of WAV, MP3, FLAC, M4A, OGG and MIDI. Speed from 50% to 150%,
+transposition from -7 to +4 semitones, and a train mode that raises the tempo one
+repetition at a time. Optional offline rendering for a cleaner slow-down.
+
+MIDI files are played with a SoundFont of your choosing, with tempo and key read
+from the file. A library scan remembers tempo and key per file. A trimmer cuts
+seamless loops out of longer tracks.

@@ -25,11 +25,24 @@ for the pitch. It costs a couple of seconds and keeps the drums intact.
 under tempo and let the piece take you up to it. The next repetition is rendered
 while the current one plays and swapped in exactly at the seam.
 
+**One cursor, two jobs.** The bar under the controls shows where the loop is and is
+also where the next Play comes in, so stopping is pausing and there is nothing to
+save or restore. It reads the same on all four roads - live, prepared, a track still
+being decoded, a score - because the position is stated as a ratio between the
+material actually being fed and the length of the original, which is the one form
+that survives a loop having been rendered to a different length.
+
 **MIDI.** A `.mid` file is a score, not a sound: changing its tempo is a
 multiplication and transposing it is an addition, so both are exact and free of
 artefacts. TrainBeat reads the file, plays it with a SoundFont of your choosing,
 and reads tempo, metre and key from the file itself instead of estimating them.
 The drum channel is never transposed.
+
+**Files from anywhere.** Anything that can send an audio file or a score can send
+it here - a download, an attachment, a file manager - and it opens straight in the
+player. Such a file is borrowed, since the permission to read it belongs to the
+sender and is withdrawn sooner or later, so the app offers to keep a copy and says
+plainly when there is nowhere to put one.
 
 **Library.** Grant a few folders and the app scans them once, storing tempo and key
 per file. Audio is analysed (spectral flux and an autocorrelated onset envelope for
@@ -55,7 +68,7 @@ No dependencies beyond AndroidX and Compose. No native code, no Google Play
 Services, no network access of any kind.
 
 ```
-./gradlew testDebugUnitTest    # 125 unit tests on a plain JVM
+./gradlew testDebugUnitTest    # unit tests on a plain JVM
 ./gradlew installDebug
 ```
 

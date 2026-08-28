@@ -19,13 +19,23 @@ object Ramp {
     const val CEILING = 2.00f            // the ramp never exceeds double speed
 
     /**
-     * Speed at loop n: base * (1 + n * step). LINEAR increment, not compounded,
-     * always computed on the starting speed. Once at the ceiling it stays there.
+     * Speed at loop n: base + n * step, where the step is a fraction of the
+     * ORIGINAL tempo and not of the starting speed.
+     *
+     * It used to be base * (1 + n * step), and that was the wrong arithmetic for
+     * what the ramp is for. From 50% with a 10% step it gave 50, 55, 60 - the step
+     * measured against where you started, so it grew as you got faster, and the
+     * part where you most need time to adapt was the part where the jumps got
+     * bigger. Now it gives 50, 60, 70: equal rungs, and you can count how many
+     * repetitions to full tempo before you start.
+     *
+     * The ceiling stays at double speed. Tempo is not the finishing line - playing
+     * a passage faster than the record is how you make it comfortable at tempo.
      */
     fun speedAt(base: Float, step: Float, loop: Int, ceiling: Float = CEILING): Float {
         val b = base.coerceIn(SPEED_MIN, SPEED_MAX)
         if (loop <= 0 || step <= 0f) return minOf(b, ceiling)
-        val v = b * (1f + loop * step)
+        val v = b + loop * step
         return if (v > ceiling) ceiling else v
     }
 

@@ -1,0 +1,238 @@
+A practice looper. It repeats a piece of music with no gap at the seam, slower
+or in another key, so a passage can be worked on until it is learned.
+
+# What It Expects of a File
+
+A file is assumed to be an exact loop already: the app repeats it as it is and
+does not hunt for a better cut. If a file is not an exact loop you will hear
+the join, and that is what Make Loop From File is for. Nothing is ever written
+over your originals.
+
+# Play File From Folder
+
+Picks any single file with the system picker and plays it. Use this for
+something you want to try once; the library is for what you come back to.
+
+# A File Sent From Another App
+
+Anything that can send an audio file or a score can send it here: a download, a
+mail attachment, a file manager, a message. TrainBeat opens it straight in the
+player, and stops whatever was playing before.
+
+A file arriving this way is BORROWED. The permission to read it belongs to the
+app that sent it and is withdrawn sooner or later - often as soon as the phone
+is restarted - so the entry left in Recent Tracks will one day open on nothing.
+That is why you are asked whether to keep a copy: a copy goes into the
+recordings folder and is yours, and it is the copy that gets played and
+remembered.
+
+If no recordings folder has been chosen there is nowhere to put a copy, and it
+says so rather than pretending. The file still plays.
+
+# Play File From Library
+
+The same player, over the folders you granted, with the tempo and the key
+already known. Search by name, or narrow by tempo range and by key. The
+half/double switch also accepts tracks at half or twice the tempo you asked
+for, which is usually what you meant.
+
+# Speed, Transpose, Train
+
+Speed and Transpose are independent: you can slow a passage down without
+lowering it, or change key at the original tempo. Train raises the speed by
+its step at every repetition - set the speed low, set a small step, and the
+loop walks you up to tempo on its own.
+
+Holding a + or - button repeats it, in the trimmer.
+
+# The Bar, and Pausing
+
+The bar under the controls says where in the piece the loop is, and it is also
+where the next Play comes in. Those are one thing, not two: drag it and press
+Play to start from there, or drag it while the music runs to move there.
+
+Which is why the button pauses rather than stops. Play carries on from the bar
+you were on, not from the top - what you want when you broke off to work
+something out. The same applies when the phone takes the sound away for a
+message: the loop pauses and Play picks it up where it was. The Stop on the
+notification is the other kind, and ends the loop outright.
+
+Moving the cursor stops the loop for an instant and comes in again, so there
+is a small gap - and with Hi-Fi on, a rendering. It is not a gesture you make
+twice a bar.
+
+On a long track that is still being decoded the bar covers the whole of it
+from the start. Move ahead of what has been read and it waits for the decoder
+rather than starting over; the decoder is many times faster than the music, so
+the wait is short.
+
+# Hi-Fi
+
+Off by default, and only offered for files up to a minute.
+
+With it off, the phone changes tempo and key while playing: instant, and good
+enough for one or two semitones. With it on, the whole loop is recomputed
+before playing - better sound, especially for larger shifts, at the cost of a
+wait.
+
+Above a minute it is not offered at all, because the wait and the memory both
+grow with the length. To use Hi-Fi on a long track, cut a loop out of it
+first.
+
+# Play From Favourites
+
+The star beside a name adds a track here. Same rows as the library - tempo,
+key, and the key still tappable to correct it - but no search and no filters:
+a shelf you keep by hand does not need filtering. The star on a row here takes
+it back off the shelf.
+
+Speed, Transpose and Train are remembered per track, starred or not, so a loop
+reopens tomorrow exactly as you left it today, and the row says at what speed
+you had got to.
+
+The order is the order you starred them in. To move something to the end - the
+exercise you have finished with, say - unstar it and star it again; nothing
+that was remembered about it is lost.
+
+Tempo and key come from the scan. A favourite that was never scanned - a file
+opened straight from a folder, a loop just cut, a recording - has none to
+show, and says so rather than inventing them.
+
+A favourite is a pointer to a document. Move or rename the file, or withdraw
+the folder, and the pointer dies: the entry stays in the list marked missing,
+and tapping it forgets it.
+
+# It Keeps Playing in the Background
+
+A loop does not stop when the screen goes dark, when the phone locks, or when
+you switch to another app to read the music. While practising you look at the
+score, not at the phone.
+
+A notification appears while it plays, and it lasts exactly as long as the
+sound does. Tapping it comes back to the app, on the track that is playing and
+not on the home page; the Stop on it ends the loop without opening anything,
+and it works whether or not the app still has a screen of its own.
+
+It also asks the system for the right to make noise, so a message arriving no
+longer kills the loop - at worst it dips for a moment.
+
+# Bluetooth: Speakers and Pedals
+
+The play button on a Bluetooth speaker works, and so does a Bluetooth page-
+turner pedal - the cheap kind sold for sheet music. Those send ordinary media
+keys, which is all this needs. With one on the floor the loop starts and stops
+without touching the phone, which is the difference between practising and
+fiddling with a screen.
+
+One button, two meanings, taken from whichever page is open: in the player it
+starts and stops the loop, in Record a loop it starts and stops recording.
+Bluetooth has no record command at all, so there is nothing to remember -
+press the button you have.
+
+Where a device sends next and previous as well, those step through the
+favourites, in the order you starred them. So a whole session - start, stop,
+on to the next exercise - runs without putting the instrument down.
+
+Android gives the media keys to whichever app played last. If the button seems
+dead, play something here once and it comes back.
+
+# Long Tracks
+
+A track is decoded whole into memory, because repeating a loop means having
+all of it. Ten minutes of stereo is about a hundred megabytes, which a phone
+will bear one at a time and not two.
+
+So this is a looper, not a music player: it is at its best with a few seconds
+to a few minutes. If a long track will not open, cut a loop out of it first
+and work on that.
+
+# Folders
+
+Four separate things, asked once each and remembered. The library folders are
+read only. The loop destination is where the trimmer writes, the recordings
+folder is where the recorder writes, and the SoundFont is for MIDI.
+
+# Scan Library
+
+Reads every file in the granted folders once and remembers its length, tempo
+and key. It can be interrupted and resumed: nothing already measured is
+measured again.
+
+Tempo and key are ESTIMATES, from the audio itself. They are usually right and
+sometimes not, and a wrong key can be corrected by hand in the player with
+Save Key. A MIDI file needs no guessing - tempo and key are written in the
+file.
+
+# Make Loop From File
+
+Cuts a loop out of a longer file. The destination folder is asked when you
+enter, so saving later is one tap.
+
+There is no waveform to drag: the cursors are placed with the sliders and the
+fine buttons, and you judge by ear while the loop keeps playing. The two play
+buttons differ only in where they come in - one from the beginning, one from
+five seconds before the end, which is where the join is and where a bad cut
+gives itself away.
+
+With Snap to Beat on, everything moves by whole beats, which is what makes a
+loop come out musical. With it off, by ten milliseconds.
+
+Auto Trim nudges both ends to the nearest quiet crossing, to remove the click
+a cut in mid-waveform leaves behind. It works on anything, recordings
+included: the click at the join does not care where the sound came from.
+
+# The Drawing and the Grid
+
+The picture follows the selection, with a little of what surrounds it, so it
+stays readable however long the track is - the selected part bright, the
+context dim, the two cuts marked. It answers one question quickly that the ear
+answers slowly: which END the silence is at.
+
+The grid divides the SELECTION into equal parts, not the detected tempo. If
+the cut is right the peaks sit on the lines; if they drift off the lines, the
+cut is wrong. The T entries add the two thinner triplet lines inside each
+division.
+
+# Record a Loop
+
+Records from the microphone and writes a WAV. It is not a pedal looper: you
+cannot hit a screen on the downbeat, so expect silence at both ends.
+
+Stopping does not save. Listen to the take, keep it or discard it - most takes
+are bad ones. Trim Silence removes the dead air at the ends and is reversible:
+it stores two offsets and applies them when you save, so switching it off
+restores the whole take.
+
+A recording carries a mark, and the trimmer opens it with Snap to beat off: a
+phrase played into a microphone has no measured tempo, so there is no beat
+grid to trust.
+
+# MIDI
+
+A .mid file can be played and trimmed like audio, and it is better material:
+tempo and key are read rather than estimated, and a cut on a bar line is exact
+by construction - no join to find.
+
+The Step menu matters more than it looks. Pieces open with a fill or a pickup,
+so the chord sequence often starts INSIDE a bar - half way in, or a third of
+the way in - and stepping by whole bars can never land there. Choose 1/2, 1/3,
+1/4, 1/6 or 1/8 of a bar and it can. The thirds are for 12/8 and for anything
+swung, and none of these divisions is approximate: a score counts in ticks, so
+a third of a bar is an exact number of them.
+
+But a score says which notes, not how they sound, so it needs a SoundFont. The
+app ships none: choose a .sf2 yourself in Folders. Be careful which one - some
+.sf2 files are effects-only supplements with no instruments in them at all,
+and the app will tell you what the file you picked actually contains.
+
+The trimmer saves either a .mid, which stays adjustable in tempo and key
+forever, or a .wav, which plays anywhere without a SoundFont.
+
+# Suggestions and Bugs
+
+Written by A. Mura, 2026. It is free software under the GPL v3, and the source
+is on GitHub.
+
+Suggestions, bug reports and requests are welcome:
+
+m.alex.mura@gmail.com

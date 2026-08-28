@@ -102,3 +102,63 @@ class LoopFeederSwapTest {
         assertEquals(0, feeder.loopsCompleted)
     }
 }
+
+/**
+ * The v1.1 addition: "play from -0:05" is the same loop entered late, not a
+ * different clip. So the first pass may start anywhere, and every pass after the
+ * first must start from zero exactly as before.
+ */
+class LoopFeederEntryTest {
+
+    @Test
+    fun theFirstPassStartsWhereAskedAndTheNextOnesFromZero() {
+        val src = ShortArray(10) { (it + 1).toShort() }
+        val feeder = LoopFeeder(src, 7)
+        val out = ShortArray(23)
+        assertEquals(23, feeder.fill(out, 23))
+        // 8 9 10 | 1..10 | 1..10
+        assertArrayEquals(
+            shortArrayOf(8, 9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+            out
+        )
+    }
+
+    @Test
+    fun thereIsNoSeamAtTheEntryPointEither() {
+        val src = ShortArray(101) { (it + 1).toShort() }
+        val feeder = LoopFeeder(src, 96)
+        val out = ShortArray(5 + 101)
+        feeder.fill(out, out.size)
+        assertEquals(src[96].toInt(), out[0].toInt())
+        assertEquals(src[100].toInt(), out[4].toInt())      // last sample of the loop
+        assertEquals(src[0].toInt(), out[5].toInt())        // immediately followed by the first
+    }
+
+    @Test
+    fun resetReturnsToTheEntryPointNotToZero() {
+        val src = ShortArray(10) { (it + 1).toShort() }
+        val feeder = LoopFeeder(src, 6)
+        feeder.fill(ShortArray(30), 30)
+        feeder.reset()
+        assertEquals(6, feeder.position)
+        assertEquals(0, feeder.loopsCompleted)
+    }
+
+    @Test
+    fun anAbsurdEntryPointIsClampedInsteadOfCrashing() {
+        val src = ShortArray(8) { (it + 1).toShort() }
+        assertEquals(7, LoopFeeder(src, 9999).position)
+        assertEquals(0, LoopFeeder(src, -5).position)
+        assertEquals(0, LoopFeeder(ShortArray(0), 4).fill(ShortArray(4), 4))
+    }
+
+    @Test
+    fun theDefaultIsStillTheOldBehaviour() {
+        val src = ShortArray(7) { (it + 1).toShort() }
+        val a = ShortArray(20)
+        val b = ShortArray(20)
+        LoopFeeder(src).fill(a, 20)
+        LoopFeeder(src, 0).fill(b, 20)
+        assertArrayEquals(a, b)
+    }
+}

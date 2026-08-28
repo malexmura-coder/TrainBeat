@@ -118,11 +118,31 @@ class MidiAnalysisTest {
         assertEquals("G", Analyzer.KEY_NAMES[MidiAnalysis.keyIndexOf(1, false)])
         assertEquals("D", Analyzer.KEY_NAMES[MidiAnalysis.keyIndexOf(2, false)])
         assertEquals("F", Analyzer.KEY_NAMES[MidiAnalysis.keyIndexOf(-1, false)])
-        assertEquals("A#", Analyzer.KEY_NAMES[MidiAnalysis.keyIndexOf(-2, false)])
+        assertEquals("Bb", Analyzer.KEY_NAMES[MidiAnalysis.keyIndexOf(-2, false)])
         assertEquals("Am", Analyzer.KEY_NAMES[MidiAnalysis.keyIndexOf(0, true)])
         assertEquals("Em", Analyzer.KEY_NAMES[MidiAnalysis.keyIndexOf(1, true)])
         assertEquals("Dm", Analyzer.KEY_NAMES[MidiAnalysis.keyIndexOf(-1, true)])
         assertEquals(-1, MidiAnalysis.keyIndexOf(9, false))
+    }
+
+    /**
+     * A key is named after its key signature, so the same twelve pitches are spelled
+     * differently in major and in minor. These four are the whole point: Db major has
+     * five flats where C# major would need seven sharps, while C# minor has four
+     * sharps where Db minor would need eight flats - so the answer flips with the
+     * mode. A# and D# are never right in either: ten and nine sharps.
+     */
+    @Test
+    fun theSpellingFollowsTheKeySignatureAndSoDependsOnTheMode() {
+        assertEquals("Db", Analyzer.KEY_NAMES[MidiAnalysis.keyIndexOf(-5, false)])   // 5 flats
+        assertEquals("C#m", Analyzer.KEY_NAMES[MidiAnalysis.keyIndexOf(4, true)])    // 4 sharps
+        assertEquals("Ab", Analyzer.KEY_NAMES[MidiAnalysis.keyIndexOf(-4, false)])   // 4 flats
+        assertEquals("G#m", Analyzer.KEY_NAMES[MidiAnalysis.keyIndexOf(5, true)])    // 5 sharps
+        // flat in both modes
+        assertEquals("Eb", Analyzer.KEY_NAMES[MidiAnalysis.keyIndexOf(-3, false)])
+        assertEquals("Bbm", Analyzer.KEY_NAMES[MidiAnalysis.keyIndexOf(-5, true)])
+        // and no key is ever spelled with these
+        assertTrue(Analyzer.KEY_NAMES.none { it.startsWith("A#") || it.startsWith("D#") })
     }
 
     @Test

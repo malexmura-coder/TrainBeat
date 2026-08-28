@@ -28,9 +28,32 @@ class AudioClip(
      */
     val loopExact: Boolean get() = !partial && fullMs in 1..LOOP_MAX_MS
 
+    /**
+     * True when this file was recorded by the app itself. It matters in the
+     * trimmer: a phrase played into the microphone has no measurable tempo, so
+     * the beat grid would place cuts by a number nobody measured.
+     */
+    val recorded: Boolean get() = info.software?.startsWith(RECORDER_TAG) == true
+
     companion object {
         /** Above this length a file is a track, not a loop. */
         const val LOOP_MAX_MS = 60_000L
+
+        /** Written into the WAV we record, and looked for when reading one back. */
+        const val RECORDER_TAG = "TrainBeat recorder"
+
+        /**
+         * A recording judged by its name. The mark inside the file is the reliable
+         * one; this is the fallback for a file that has been through another
+         * program and lost it, and it is why recordings are named this way.
+         */
+        fun looksRecorded(name: String): Boolean = name.lowercase().startsWith("rec_")
+
+        /** rec_yyyyMMdd_HHmm.wav - says what it is and when it was made. */
+        fun recordingName(millis: Long): String {
+            val f = java.text.SimpleDateFormat("yyyyMMdd_HHmm", java.util.Locale.US)
+            return "rec_" + f.format(java.util.Date(millis)) + ".wav"
+        }
     }
 }
 
@@ -41,5 +64,7 @@ data class FormatInfo(
     val encoding: String,      // PCM 24 bit, IEEE float 32 bit, MPEG audio, ...
     val sampleRate: Int,
     val channels: Int,
-    val notes: List<String> = emptyList()
+    val notes: List<String> = emptyList(),
+    /** Name of the program that wrote the file, when it says so. */
+    val software: String? = null
 )

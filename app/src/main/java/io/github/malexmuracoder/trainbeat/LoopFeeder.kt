@@ -18,23 +18,48 @@ package io.github.malexmuracoder.trainbeat
  */
 class LoopFeeder(
     src: ShortArray,
-    /** Asked for the buffer to use from repetition n on. Null means keep the current one. */
+    /**
+     * Where the FIRST pass begins, in samples. Everything after the first wrap
+     * starts from zero as always, so this changes where you come in and nothing
+     * else - which is what makes "play from five seconds before the end" the real
+     * loop entered late, rather than a special clip with a junction of its own.
+     */
+    startAt: Int = 0,
+    /**
+     * Asked for the buffer to use from repetition n on. Null means keep the
+     * current one. Deliberately the LAST parameter so it can still be passed as a
+     * trailing lambda.
+     */
     private val next: ((Int) -> ShortArray?)? = null
 ) : Feeder {
 
     @Volatile private var cur: ShortArray = src
-    private var pos = 0
+
+    /**
+     * Where the first pass comes in, kept inside the array and no more than that.
+     *
+     * This class counts SAMPLES and is not told how many channels they are
+     * interleaved from, so it cannot put an index on a frame boundary and does not
+     * pretend to: that is Cursor.sampleAt's job, and every caller goes through it.
+     * The distinction matters, because entering a stereo loop on an odd index reads
+     * right where left should be for the whole repetition - inaudible on a drum
+     * loop, unmistakable on anything with a stereo image. What is guaranteed here
+     * is only that an absurd figure cannot crash the feeder.
+     */
+    private val entry = startAt.coerceIn(0, if (src.isEmpty()) 0 else src.size - 1)
+
+    @Volatile private var pos = entry
 
     /** Repetitions completed, counted as they are WRITTEN, not as they are heard. */
     @Volatile override var loopsCompleted = 0
         private set
 
-    val position: Int get() = pos
+    override val position: Int get() = pos
 
-    val loopSamples: Int get() = cur.size
+    override val loopSamples: Int get() = cur.size
 
     fun reset() {
-        pos = 0
+        pos = entry
         loopsCompleted = 0
     }
 

@@ -44,6 +44,7 @@ object WavReader {
         var blockAlign = 0
         val notes = ArrayList<String>()
         var dataSize64 = -1L
+        var software: String? = null
 
         while (true) {
             val idBytes = ByteArray(4)
@@ -89,7 +90,23 @@ object WavReader {
                     }
                     val declared = if (dataSize64 > 0) dataSize64 else size
                     val clip = decodeData(s, tag, channels, sampleRate, bits, blockAlign, declared, container, notes)
-                    return clip
+                    return if (software == null) clip else AudioClip(
+                        clip.samples, clip.sampleRate, clip.channels,
+                        clip.info.copy(software = software), clip.totalMs, clip.partial
+                    )
+                }
+                "LIST" -> {
+                    // The one chunk worth reading rather than skipping: LIST/INFO
+                    // holds the name of the software that wrote the file, which is
+                    // how the trimmer later knows a recording made on this phone
+                    // and starts it with the beat grid switched off.
+                    val body = ByteArray(minOf(size, 8192L).toInt())
+                    readFully(s, body, body.size)
+                    val rest = size - body.size
+                    if (rest > 0) skipFully(s, rest)
+                    if (size % 2 == 1L) skipFully(s, 1)
+                    software = infoSoftware(body)
+                    if (software != null) notes += "written by $software"
                 }
                 else -> {
                     skipFully(s, size + (size % 2))
@@ -221,6 +238,30 @@ object WavReader {
         var v = 0L
         for (k in 7 downTo 0) v = (v shl 8) or (b[o + k].toLong() and 0xFF)
         return v
+    }
+
+    /** ISFT inside a LIST/INFO chunk: the name of the program that wrote the file. */
+    private fun infoSoftware(body: ByteArray): String? {
+        if (body.size < 12) return null
+        if (String(body, 0, 4, Charsets.US_ASCII) != "INFO") return null
+        var p = 4
+        while (p + 8 <= body.size) {
+            val id = String(body, p, 4, Charsets.US_ASCII)
+            val len = ((body[p + 4].toInt() and 0xFF)) or ((body[p + 5].toInt() and 0xFF) shl 8) or
+                ((body[p + 6].toInt() and 0xFF) shl 16) or ((body[p + 7].toInt() and 0xFF) shl 24)
+            if (len < 0 || p + 8 + len > body.size) return null
+            if (id == "ISFT") {
+                val sb = StringBuilder()
+                for (i in 0 until len) {
+                    val c = body[p + 8 + i].toInt() and 0xFF
+                    if (c == 0) break
+                    if (c >= 32) sb.append(c.toChar())
+                }
+                return sb.toString().trim().ifEmpty { null }
+            }
+            p += 8 + len + (len % 2)
+        }
+        return null
     }
 
     private fun readU32(s: InputStream): Long {

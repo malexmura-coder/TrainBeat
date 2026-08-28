@@ -6,7 +6,16 @@
          runs, only its progress notification is hidden. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!-- A loop must keep playing when the screen goes off: while practising you look
+         at the music, not at the phone. Playback only - the recorder deliberately
+         does not run in the background. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- "Record a loop" needs the microphone, and nothing else does. Asked for at
+         the moment of use, not at startup. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:allowBackup="true"
@@ -16,14 +25,68 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.TrainBeat">
+        <!-- singleTask, and it matters. With the default mode a notification or a
+             media session opening the app started a SECOND copy of this activity on
+             top of the first: the new one showed the home page while the old one,
+             still alive underneath, went on playing a loop that nothing could then
+             reach or stop. One instance means coming back finds the screen as it
+             was left, still on the track that is playing. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:label="@string/app_name"
             android:theme="@style/Theme.TrainBeat">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Opened from somewhere else: a download, a file manager, a mail
+                 attachment. The types are listed rather than left to audio/* alone
+                 because a MIDI file is declared half a dozen ways and some of them
+                 are not under audio at all. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="application/midi" />
+                <data android:mimeType="application/x-midi" />
+                <data android:mimeType="application/ogg" />
+                <data android:mimeType="application/x-ogg" />
+            </intent-filter>
+
+            <!-- Shared to the app rather than opened by it, which is the same file
+                 arriving through the other door. No scheme here on purpose: a share
+                 is matched on type alone, and declaring one would stop it matching
+                 at all. Nor is the generic stream type below repeated here - a share
+                 sheet is opened many times a day, and being offered for every file
+                 in it would be a nuisance rather than a convenience. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="application/midi" />
+                <data android:mimeType="application/x-midi" />
+                <data android:mimeType="application/ogg" />
+            </intent-filter>
+
+            <!-- The case that made this worth doing: a .mid downloaded from a web
+                 server that served it as a generic stream. Android has nothing to
+                 match on but the declared type, so appearing at all means claiming
+                 this one - which also offers the app for files it cannot possibly
+                 play. It says so plainly when the file turns out not to be music.
+                 Delete this block if the clutter annoys you more than the misses. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/octet-stream" />
             </intent-filter>
         </activity>
 
@@ -31,6 +94,11 @@
             android:name=".ScanService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <service
+            android:name=".PlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
     </application>
 
 </manifest>

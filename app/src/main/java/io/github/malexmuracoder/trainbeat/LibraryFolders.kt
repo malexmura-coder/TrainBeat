@@ -42,6 +42,17 @@ object LibraryFolders {
     fun storeFile(ctx: Context) = java.io.File(ctx.filesDir, "library.tsv")
 
     /**
+     * The stars and the remembered settings, in their own file.
+     *
+     * Kept apart from library.tsv on purpose: that one is a cache of measurements
+     * and can be thrown away and rebuilt by a scan, while this one is the user's
+     * own decisions and must never be lost to a rescan.
+     */
+    fun prefsFile(ctx: Context) = java.io.File(ctx.filesDir, "tracks.tsv")
+
+    fun prefs(ctx: Context) = TrackPrefs(prefsFile(ctx))
+
+    /**
      * Writes a hand-set key, or clears it with key = null.
      *
      * Works even for a track the scan has never seen: a record is created with

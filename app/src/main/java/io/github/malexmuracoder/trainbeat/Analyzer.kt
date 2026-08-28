@@ -50,11 +50,16 @@ object Analyzer {
         7.0f, 2.0f, 3.5f, 4.5f, 2.0f, 4.0f, 2.0f, 5.5f, 3.5f, 2.0f, 4.5f, 4.0f
     )
 
-    private val NOTES = arrayOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+    // A key is named after its key signature, and that is why these two lists
+    // differ. Db major has five flats where C# major would have seven sharps; but
+    // C# minor has four sharps where Db minor would have eight flats. A# and D#
+    // are not keys at all - they would need ten and nine sharps.
+    private val MAJOR = arrayOf("C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B")
+    private val MINOR = arrayOf("C", "C#", "D", "Eb", "E", "F", "F#", "G", "G#", "A", "Bb", "B")
 
     /** The 24 keys in a fixed order: index = root * 2 + mode, mode 0 major, 1 minor. */
     val KEY_NAMES: Array<String> = Array(24) { i ->
-        if (i % 2 == 0) NOTES[i / 2] else NOTES[i / 2] + "m"
+        if (i % 2 == 0) MAJOR[i / 2] else MINOR[i / 2] + "m"
     }
 
     fun keyIndex(name: String): Int = KEY_NAMES.indexOf(name)

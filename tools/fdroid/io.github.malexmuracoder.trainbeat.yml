@@ -5,18 +5,20 @@ AuthorName: Alessandro Mura
 SourceCode: https://github.com/malexmura-coder/TrainBeat
 IssueTracker: https://github.com/malexmura-coder/TrainBeat/issues
 
+AutoName: TrainBeat
+
 RepoType: git
 Repo: https://github.com/malexmura-coder/TrainBeat.git
 
 Builds:
   - versionName: '1.0'
     versionCode: 1
-    commit: v1.0
+    commit: a01a1cf375794bfddc6066eaa6f98c0019003a67
     subdir: app
     gradle:
       - yes
 
-AutoUpdateMode: Version v%v
+AutoUpdateMode: Version
 UpdateCheckMode: Tags
 CurrentVersion: '1.0'
 CurrentVersionCode: 1

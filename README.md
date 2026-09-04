@@ -15,8 +15,9 @@ end of the material the next sample written is the first one again, inside the
 same write cycle. The audio stream never stops, so the seam is sample-exact. This
 is proved by unit tests, not by ear.
 
-**Speed and key.** By default the device applies them while playing — instant, and
-good enough for the semitone or two most practice actually uses. For short loops a
+**Speed and key.** By default the device applies them as the loop plays: nothing is
+prepared, so pressing play is instant, and it is good enough for the semitone or two
+most practice actually uses. They are chosen with the loop stopped. For short loops a
 `hi-fi` switch prepares the material instead, offline: a phase vocoder with phase
 locking and a phase reset on onsets for the tempo, band-limited sinc resampling
 for the pitch. It costs a couple of seconds and keeps the drums intact.
@@ -43,6 +44,12 @@ it here - a download, an attachment, a file manager - and it opens straight in t
 player. Such a file is borrowed, since the permission to read it belongs to the
 sender and is withdrawn sooner or later, so the app offers to keep a copy and says
 plainly when there is nowhere to put one.
+
+**A mixer for scores.** An instrument of a MIDI file can be switched off, which is
+exact rather than approximate: the notes of that channel are simply not played, so
+nothing is filtered and nothing is subtracted. Opening the mixer stops the loop, on
+purpose - the rendering has to be made again, and a silence the user asked for is
+better than one that happens to them.
 
 **Library.** Grant a few folders and the app scans them once, storing tempo and key
 per file. Audio is analysed (spectral flux and an autocorrelated onset envelope for

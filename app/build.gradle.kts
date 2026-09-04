@@ -1,7 +1,28 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+/**
+ * Where the signing key is, read from local.properties, which git ignores.
+ *
+ * Absent everywhere but this machine, and that is the point. F-Droid builds this
+ * same file on their own server and signs the result with their own key, so there
+ * the properties are missing, no signing config is attached, and assembleRelease
+ * produces the unsigned APK they expect. A signing config that named a keystore
+ * which is not there would fail their build rather than be ignored by it.
+ *
+ * Nothing about the key lives in the repository: not the password, and not even
+ * the path to it. A secret committed once is committed for good - removing it
+ * later leaves it in the history, where it is still readable.
+ */
+val signingProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val keystorePath: String = signingProps.getProperty("TRAINBEAT_STORE_FILE") ?: ""
 
 android {
     namespace = "io.github.malexmuracoder.trainbeat"
@@ -15,14 +36,29 @@ android {
         applicationId = "io.github.malexmuracoder.trainbeat"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
+    }
+
+    signingConfigs {
+        if (keystorePath.isNotEmpty()) {
+            create("release") {
+                storeFile = file(keystorePath)
+                // PKCS12 keeps one password for the store and for the key
+                storePassword = signingProps.getProperty("TRAINBEAT_STORE_PASSWORD")
+                keyAlias = signingProps.getProperty("TRAINBEAT_KEY_ALIAS")
+                keyPassword = signingProps.getProperty("TRAINBEAT_STORE_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             optimization {
                 enable = false
+            }
+            if (keystorePath.isNotEmpty()) {
+                signingConfig = signingConfigs.getByName("release")
             }
         }
     }

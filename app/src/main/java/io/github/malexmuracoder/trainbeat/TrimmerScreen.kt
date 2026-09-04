@@ -331,21 +331,6 @@ fun TrimmerScreen(player: LoopPlayer, onBack: () -> Unit) {
             // ---------------- a score: cut on bar lines ----------------
             sc != null -> {
                 val info = midiInfo
-                Spacer(Modifier.height(8.dp))
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(10.dp)) {
-                        Line("Score", info?.let { MidiFile.describe(sc, it) } ?: "-")
-                        Line("Tempo", info?.tempoLabel() ?: "-")
-                        Line("Bars", "$totalBars in the file")
-                        Line(
-                            "Selection",
-                            BarStep.label(startTick, ticksPerBar, barStep) + "  ->  " +
-                                BarStep.label(endTick, ticksPerBar, barStep) + "  ·  " +
-                                fixed("%.2f s", tickSeconds(sc, startTick, endTick))
-                        )
-                    }
-                }
-
                 val step = BarStep.ticks(barStep, ticksPerBar)
 
                 Spacer(Modifier.height(6.dp))
@@ -506,6 +491,24 @@ fun TrimmerScreen(player: LoopPlayer, onBack: () -> Unit) {
                     Spacer(Modifier.height(4.dp))
                     Text(message, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
                 }
+
+                // Under the controls, not over them. The numbers here follow the
+                // cursors and are worth a glance; the buttons are worth a tap, and
+                // on a small screen only one of the two can be above the fold.
+                Spacer(Modifier.height(12.dp))
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(10.dp)) {
+                        Line("Score", info?.let { MidiFile.describe(sc, it) } ?: "-")
+                        Line("Tempo", info?.tempoLabel() ?: "-")
+                        Line("Bars", "$totalBars in the file")
+                        Line(
+                            "Selection",
+                            BarStep.label(startTick, ticksPerBar, barStep) + "  ->  " +
+                                BarStep.label(endTick, ticksPerBar, barStep) + "  ·  " +
+                                fixed("%.2f s", tickSeconds(sc, startTick, endTick))
+                        )
+                    }
+                }
             }
 
             // ---------------- audio: cut on beats, then look for the seam ----------------
@@ -513,33 +516,10 @@ fun TrimmerScreen(player: LoopPlayer, onBack: () -> Unit) {
                 val lenFrames = (endFrame - startFrame).coerceAtLeast(0)
                 val beats = if (framesPerBeat > 0) lenFrames.toDouble() / framesPerBeat else 0.0
 
-                Spacer(Modifier.height(8.dp))
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(10.dp)) {
-                        Line("Track", String.format("%s  ·  %d Hz  ·  %s", timeOf(c.frames, c.sampleRate),
-                            c.sampleRate, if (c.channels == 1) "mono" else "${c.channels} ch"))
-                        if (c.recorded || AudioClip.looksRecorded(name)) {
-                            Line("Source", "Recorded on this phone - snap to beat is off")
-                        } else {
-                            Line("Tempo", if (bpm > 0f) fixed("%.1f BPM", bpm) else "Not detected")
-                        }
-                        Line(
-                            "Start / End",
-                            timeOf(startFrame, c.sampleRate) + "  ->  " + timeOf(endFrame, c.sampleRate)
-                        )
-                        Line(
-                            "Loop",
-                            if (framesPerBeat > 0)
-                                timeOf(lenFrames, c.sampleRate) +
-                                    fixed("   %.2f beats   %.2f bars", beats, beats / 4.0)
-                            else timeOf(lenFrames, c.sampleRate)
-                        )
-                    }
-                }
-
-                // Half the height of the card above, and it answers the one question
-                // the card cannot: on a short take, WHICH END the dead air is at.
-                // Judging that by ear means playing the whole thing twice.
+                // The picture stays at the top, where the card used to be. It
+                // answers the one question the numbers cannot - on a short take,
+                // WHICH END the dead air is at - and judging that by ear means
+                // playing the whole thing twice.
                 Spacer(Modifier.height(10.dp))
                 Waveform(
                     shape = shape,
@@ -758,6 +738,31 @@ fun TrimmerScreen(player: LoopPlayer, onBack: () -> Unit) {
                 if (message.isNotEmpty()) {
                     Spacer(Modifier.height(4.dp))
                     Text(message, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                }
+
+                // Under the controls, not over them: see the score branch above.
+                Spacer(Modifier.height(12.dp))
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(10.dp)) {
+                        Line("Track", String.format("%s  ·  %d Hz  ·  %s", timeOf(c.frames, c.sampleRate),
+                            c.sampleRate, if (c.channels == 1) "mono" else "${c.channels} ch"))
+                        if (c.recorded || AudioClip.looksRecorded(name)) {
+                            Line("Source", "Recorded on this phone - snap to beat is off")
+                        } else {
+                            Line("Tempo", if (bpm > 0f) fixed("%.1f BPM", bpm) else "Not detected")
+                        }
+                        Line(
+                            "Start / End",
+                            timeOf(startFrame, c.sampleRate) + "  ->  " + timeOf(endFrame, c.sampleRate)
+                        )
+                        Line(
+                            "Loop",
+                            if (framesPerBeat > 0)
+                                timeOf(lenFrames, c.sampleRate) +
+                                    fixed("   %.2f beats   %.2f bars", beats, beats / 4.0)
+                            else timeOf(lenFrames, c.sampleRate)
+                        )
+                    }
                 }
             }
 

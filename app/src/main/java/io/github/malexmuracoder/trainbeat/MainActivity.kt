@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -37,6 +38,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -225,6 +227,19 @@ private fun AppRoot(player: LoopPlayer, arrival: State<Arrival?>) {
         )
     }
     val back = { route = Route.Home }
+
+    /**
+     * Back goes home, and only leaves the app from home.
+     *
+     * On a phone with gesture navigation, back is a thumb sweep from the edge -
+     * easy to make by accident while reaching for a slider - and from a screen
+     * inside the app it used to close the app outright, taking the loop with it.
+     * Going up one level instead is what every other screen on the phone does.
+     *
+     * Registered BEFORE the screens, so that a screen with something of its own to
+     * close - the mixer - is asked first, and this runs only if nothing did.
+     */
+    BackHandler(enabled = route != Route.Home) { back() }
 
     /**
      * A file sent in from outside, not yet answered for.
@@ -646,10 +661,42 @@ private fun PlayerScreen(
     var train by remember(uri) { mutableStateOf(saved?.train ?: 0f) }
     var starred by remember(uri) { mutableStateOf(saved?.favourite ?: false) }
 
+    /**
+     * Which instruments of a score are switched on, remembered like the rest.
+     *
+     * It belongs with speed, key and train and not apart from them: coming back to
+     * an exercise tomorrow means coming back to it as you left it, and having
+     * switched the melody off in order to play it yourself is exactly the kind of
+     * decision you do not want to make again every day.
+     */
+    var voices by remember(uri) { mutableStateOf(saved?.voices ?: Instruments.ALL) }
+
+    /**
+     * Open only while the mixer is being used, which is never while playing.
+     *
+     * Saveable, so that a rotation does not close it behind the user's back and
+     * leave the music stopped for a reason that is no longer on screen.
+     */
+    var mixerOpen by rememberSaveable(uri) { mutableStateOf(false) }
+
+    /**
+     * Back closes the mixer before it leaves the screen, which is what the gesture
+     * means while a panel is open.
+     *
+     * An empty mixer must not survive that gesture: Apply refuses to close on one,
+     * and leaving by the back door instead would store a track that plays nothing
+     * and reopens playing nothing. So that one case switches everything back on.
+     */
+    BackHandler(enabled = mixerOpen) {
+        val open = score
+        if (open != null && !Instruments.anySounding(voices, open)) voices = Instruments.ALL
+        mixerOpen = false
+    }
+
     // written when they settle, not on every tap of a stepper
-    LaunchedEffect(uri, speed, pitch, train) {
+    LaunchedEffect(uri, speed, pitch, train, voices) {
         delay(600)
-        LibraryFolders.prefs(ctx).remember(uri, name, speed, pitch, train)
+        LibraryFolders.prefs(ctx).remember(uri, name, speed, pitch, train, voices)
     }
 
     /**
@@ -809,6 +856,13 @@ private fun PlayerScreen(
                 trainer?.close()
                 stream?.cancelled = true
                 Renderer.clearCache()
+                // Give the right to make noise back HERE, and not in whatever
+                // pressed the button. Leaving this screen has more than one door -
+                // the link, the back gesture, opening another track - and a focus
+                // request that is dropped instead of abandoned is never recovered:
+                // the next request overwrites the field, and the system goes on
+                // believing this app is playing, so everything else stays ducked.
+                Playback.abandonFocus(ctx)
                 Playback.ended(ctx)
             }
         }
@@ -826,9 +880,16 @@ private fun PlayerScreen(
                         "\"${sf.name}\" has no instruments, only sound effects. " +
                             "Choose the large General MIDI .sf2.")
                 }
-                Renderer.midiCached(atSpeed, pitch, size) ?: run {
-                    val res = Renderer.forMidi(sc, sf, 44100, atSpeed, pitch, size)
-                    Renderer.storeMidi(atSpeed, pitch, size, res.samples)
+                // Said here rather than found out later. With every instrument
+                // switched off the render is empty, and the message that would
+                // follow blames the SoundFont for something the mixer did.
+                if (!Instruments.anySounding(voices, sc)) {
+                    throw IllegalStateException(
+                        "Every instrument is switched off in the Midi Mixer.")
+                }
+                Renderer.midiCached(atSpeed, pitch, size, voices) ?: run {
+                    val res = Renderer.forMidi(sc, sf, 44100, atSpeed, pitch, size, voices)
+                    Renderer.storeMidi(atSpeed, pitch, size, res.samples, voices)
                     res.samples
                 }
             }
@@ -958,11 +1019,6 @@ private fun PlayerScreen(
             }
 
             ready -> {
-                if (sc != null) MidiCard(sc, midiInfo, known, sfSummary ?: sfLabel)
-                else if (c != null) InfoCard(c, known)
-                else if (st != null) StreamCard(st, known)
-                Spacer(Modifier.height(4.dp))
-
                 Stepper(
                     label = "Speed",
                     value = Ramp.speedLabel(speed),
@@ -1000,6 +1056,23 @@ private fun PlayerScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                } else {
+                    // The same line of the screen, because on a score Hi-Fi has
+                    // nothing to offer - tempo and key are changed in the notes, so
+                    // there is no better and worse way of doing it - while the one
+                    // thing a score CAN do that audio cannot is leave an instrument
+                    // out. One row, one choice, whichever kind of file is open.
+                    MidiMixer(
+                        score = sc,
+                        voices = voices,
+                        open = mixerOpen,
+                        // not while a rendering is in flight: it would finish and
+                        // start playing behind an open mixer, which is the one
+                        // state this design exists to make impossible
+                        onOpen = { if (!preparing) { pause(); mixerOpen = true } },
+                        onToggle = { ch -> voices = Instruments.toggled(voices, ch) },
+                        onApply = { mixerOpen = false }
+                    )
                 }
 
                 Spacer(Modifier.height(6.dp))
@@ -1008,7 +1081,7 @@ private fun PlayerScreen(
                 val togglePlay: () -> Unit = {
                         if (playing) {
                             pause()
-                        } else if (!preparing) {
+                        } else if (!preparing && !mixerOpen) {
                             // ask for the right to make noise, and stop cleanly if it
                             // is taken away: without this a notification sound can
                             // kill the loop with no way back
@@ -1112,7 +1185,9 @@ private fun PlayerScreen(
                 PositionBar(
                     positionMs = positionMs,
                     lengthMs = lengthMs,
-                    enabled = !preparing,
+                    // while the mixer is open nothing plays, on purpose: the whole
+                    // point of it being open is that a silence was asked for
+                    enabled = !preparing && !mixerOpen,
                     onSeek = { ms ->
                         positionMs = ms
                         Playback.moved(ms)
@@ -1126,7 +1201,7 @@ private fun PlayerScreen(
 
                 Button(
                     onClick = togglePlay,
-                    enabled = !preparing,
+                    enabled = !preparing && !mixerOpen,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
@@ -1138,6 +1213,7 @@ private fun PlayerScreen(
                 Text(
                     when {
                         preparing -> "Rendering"
+                        mixerOpen -> "Stopped for the mixer"
                         playing -> "${Ramp.speedLabel(liveSpeed)}   loop ${liveLoop + 1}" +
                             (trainer?.let { if (it.misses > 2) "   behind" else "" } ?: "")
                         Renderer.isPlain(speed, pitch) -> "Ready"
@@ -1191,12 +1267,120 @@ private fun PlayerScreen(
                         modifier = Modifier.weight(1f)
                     ) { Text("Clear") }
                 }
+
+                // LAST, and it used to be first. What the file is - its format, its
+                // tempo, its key - is read once and then never again, while the
+                // controls above are touched all the time. On a small screen a card
+                // at the top pushed Play off the bottom of the page, which put a
+                // scroll between the user and the only button that matters.
+                Spacer(Modifier.height(14.dp))
+                if (sc != null) MidiCard(sc, midiInfo, known, sfSummary ?: sfLabel)
+                else if (c != null) InfoCard(c, known)
+                else if (st != null) StreamCard(st, known)
             }
 
             else -> Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp))
                 Text("  Decoding $decoded%", fontSize = 14.sp)
             }
+        }
+    }
+}
+
+/**
+ * The mixer for a score: an instrument per row, and a tick against each.
+ *
+ * WHY IT STOPS THE MUSIC, which is the whole design and not an apology for it. A
+ * score is played from a buffer prepared in advance, so switching an instrument off
+ * means preparing it again - a couple of seconds during which there is nothing to
+ * hear. That silence has to be something the user ASKED for, at a moment they chose,
+ * or it is a silence that happens to them: they tick a box, the music stops for no
+ * stated reason, and they conclude the app is broken. So opening the mixer stops the
+ * loop, the ticking happens in silence, Apply closes it, and Play starts again from
+ * where the cursor was left. Nobody is ever surprised.
+ *
+ * The alternative - rendering every channel separately and mixing them live - buys
+ * an instant mute at the price of one buffer per instrument in memory, in an app
+ * that already holds as much of a track as a phone will bear, and of a second place
+ * where the train ramp has to swap buffers exactly at the seam.
+ *
+ * Closed, it is one line and costs nothing to ignore. Open, it is as tall as the
+ * score has instruments, and the page scrolls.
+ */
+@Composable
+private fun MidiMixer(
+    score: Score,
+    voices: Int,
+    open: Boolean,
+    onOpen: () -> Unit,
+    onToggle: (Int) -> Unit,
+    onApply: () -> Unit
+) {
+    val parts = remember(score) { Instruments.partsOf(score) }
+    val off = parts.count { !Instruments.isOn(voices, it.channel) }
+
+    if (!open) {
+        TextButton(onClick = onOpen, contentPadding = PaddingValues(0.dp)) {
+            Text(
+                // says what it is, and admits when it is doing something
+                if (off == 0) "Midi Mixer"
+                else if (off == 1) "Midi Mixer: 1 instrument off"
+                else "Midi Mixer: $off instruments off",
+                fontSize = 13.sp
+            )
+        }
+        return
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Text("Midi Mixer", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                "The loop is stopped. Choose the instruments, then Apply and press Play.",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(6.dp))
+
+            parts.forEach { part ->
+                val on = Instruments.isOn(voices, part.channel)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        // the whole row, not just the little box: this gets tapped
+                        // with an instrument in the other hand
+                        .clickable { onToggle(part.channel) }
+                        .padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(checked = on, onCheckedChange = { onToggle(part.channel) })
+                    Text(
+                        part.label,
+                        fontSize = 14.sp,
+                        color = if (on) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            if (off == parts.size) {
+                Text(
+                    "Everything is off: switch one back on to close the mixer.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+            // Refused rather than accepted and then reported. Applying an empty
+            // mixer would fail at the render, and a failed render replaces the
+            // whole screen with "Cannot play this file" - blaming the file for
+            // something the mixer did, with no way back except leaving the track.
+            Button(
+                onClick = onApply,
+                enabled = off < parts.size,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Apply") }
         }
     }
 }

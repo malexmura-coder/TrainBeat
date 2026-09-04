@@ -21,22 +21,35 @@ object Renderer {
     /** How many prepared repetitions are kept: enough for a stepper tapped back and forth. */
     private const val CACHE_MAX = 4
 
-    class Key(val speed: Int, val semitones: Int, val stamp: Long) {
+    /**
+     * What a prepared buffer is prepared FOR.
+     *
+     * [voices] is the mixer's channel mask, and it has to be in here. A buffer is
+     * identified by everything that went into making it, and once an instrument can
+     * be switched off, the same speed and the same key no longer describe the same
+     * sound. Leave it out and turning the bass off returns the cached buffer with
+     * the bass still in it - which looks exactly like a switch that does nothing.
+     * Audio has no channels to switch, and passes ALL.
+     */
+    class Key(val speed: Int, val semitones: Int, val stamp: Long, val voices: Int) {
         override fun equals(other: Any?): Boolean =
-            other is Key && other.speed == speed && other.semitones == semitones && other.stamp == stamp
-        override fun hashCode(): Int = speed * 31 + semitones * 7 + stamp.hashCode()
+            other is Key && other.speed == speed && other.semitones == semitones &&
+                other.stamp == stamp && other.voices == voices
+        override fun hashCode(): Int = speed * 31 + semitones * 7 + voices * 131 + stamp.hashCode()
     }
 
     private val cache = LinkedHashMap<Key, ShortArray>()
 
     fun clearCache() = synchronized(cache) { cache.clear() }
 
-    fun cached(speed: Float, semitones: Int, stamp: Long): ShortArray? =
-        synchronized(cache) { cache[Key(Math.round(speed * 1000), semitones, stamp)] }
+    fun cached(speed: Float, semitones: Int, stamp: Long, voices: Int = Instruments.ALL): ShortArray? =
+        synchronized(cache) { cache[Key(Math.round(speed * 1000), semitones, stamp, voices)] }
 
-    private fun put(speed: Float, semitones: Int, stamp: Long, data: ShortArray) {
+    private fun put(
+        speed: Float, semitones: Int, stamp: Long, voices: Int, data: ShortArray
+    ) {
         synchronized(cache) {
-            cache[Key(Math.round(speed * 1000), semitones, stamp)] = data
+            cache[Key(Math.round(speed * 1000), semitones, stamp, voices)] = data
             while (cache.size > CACHE_MAX) {
                 val oldest = cache.keys.firstOrNull() ?: break
                 cache.remove(oldest)
@@ -63,7 +76,8 @@ object Renderer {
         if (isPlain(speed, semitones)) return base.samples
         cached(speed, semitones, stamp)?.let { return it }
         val out = Stretch.render(base.samples, base.channels, speed.toDouble(), semitones, cancelled, progress)
-        put(speed, semitones, stamp, out)
+        // audio has no channels to switch off: every buffer here is the whole thing
+        put(speed, semitones, stamp, Instruments.ALL, out)
         return out
     }
 
@@ -79,19 +93,25 @@ object Renderer {
         speed: Float,
         semitones: Int,
         stamp: Long,
+        /** The mixer's channel mask: everything, unless something was switched off. */
+        voices: Int = Instruments.ALL,
         cancelled: () -> Boolean = { false },
         progress: (Double) -> Unit = {}
     ): Synth.Result {
-        val used = if (semitones == 0) score else score.transpose(semitones)
+        // Muted first, transposed second: the notes that will not be heard should
+        // not be moved, and dropping them first is also the cheaper order.
+        val heard = score.onlyChannels(voices)
+        val used = if (semitones == 0) heard else heard.transpose(semitones)
         return Synth.render(used, sf, sampleRate, speed.toDouble(), cancelled, progress)
     }
 
     /** Cached MIDI samples, or null: the caller renders and stores them. */
-    fun midiCached(speed: Float, semitones: Int, stamp: Long): ShortArray? =
-        cached(speed, semitones, stamp)
+    fun midiCached(speed: Float, semitones: Int, stamp: Long, voices: Int = Instruments.ALL): ShortArray? =
+        cached(speed, semitones, stamp, voices)
 
-    fun storeMidi(speed: Float, semitones: Int, stamp: Long, data: ShortArray) =
-        put(speed, semitones, stamp, data)
+    fun storeMidi(
+        speed: Float, semitones: Int, stamp: Long, data: ShortArray, voices: Int = Instruments.ALL
+    ) = put(speed, semitones, stamp, voices, data)
 
     /**
      * The speed of repetition [loop] under a train ramp, which is what the next

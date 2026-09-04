@@ -7,10 +7,11 @@ sample after the last one is the first one again and the stream never stops. Tha
 matters when what you are looping is a single bar you intend to play over for
 twenty minutes.
 
-Speed and key are applied by the device while playing, which is instant. For short
-loops a "hi-fi" switch prepares the material offline instead, with a phase vocoder
-that resets its phases on every drum hit, so a slowed-down groove keeps its
-attacks.
+Speed and key cost nothing to apply: the device does the work as the loop plays, so
+nothing is prepared in advance and pressing play is instant. They are chosen with
+the loop stopped - changing one means stopping and starting again. For short loops
+a "hi-fi" switch prepares the material offline instead, with a phase vocoder that
+resets its phases on every drum hit, so a slowed-down groove keeps its attacks.
 
 Train mode raises the tempo by a fixed step every repetition, so you can start
 under tempo and let the piece carry you up to it.

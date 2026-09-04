@@ -1,0 +1,10 @@
+Playback no longer stops when the screen goes off. A loop keeps running in the
+background behind a notification that can stop it, and Bluetooth media keys and
+page-turner pedals drive it.
+
+A cursor shows where the loop is and sets where Play comes in, so stopping is
+pausing and Play carries on from the same bar.
+
+Audio files and scores sent in from other apps open straight in the player.
+
+On a MIDI file, single instruments can be switched off.

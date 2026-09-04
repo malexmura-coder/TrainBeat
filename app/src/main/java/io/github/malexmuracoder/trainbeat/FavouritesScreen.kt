@@ -161,10 +161,13 @@ fun FavouritesScreen(onBack: () -> Unit, onOpen: (String, String) -> Unit) {
  * tells you what speed you had got to, without opening anything.
  */
 private fun settingsLine(e: TrackPrefs.Entry): String {
-    val bits = ArrayList<String>(3)
+    val bits = ArrayList<String>(4)
     if (e.speed != 1.0f) bits.add(Ramp.speedLabel(e.speed))
     if (e.semitones != 0) bits.add(Ramp.pitchLabel(e.semitones))
     if (e.train > 0f) bits.add("train " + Ramp.trainLabel(e.train))
+    // A silenced instrument changes what you will hear more than a semitone does,
+    // so it belongs on the same line rather than being a surprise on opening.
+    if (e.voices != Instruments.ALL) bits.add("mixer")
     return bits.joinToString("  ·  ")
 }
 

@@ -43,6 +43,10 @@ lowering it, or change key at the original tempo. Train raises the speed by
 its step at every repetition - set the speed low, set a small step, and the
 loop walks you up to tempo on its own.
 
+All three are chosen with the loop stopped. On a prepared loop - Hi-Fi, or a
+score - changing one means rendering the whole repetition again, so the steppers
+wait until you stop rather than being live on one road and not on the other.
+
 Holding a + or - button repeats it, in the trimmer.
 
 # The Bar, and Pausing
@@ -70,8 +74,9 @@ the wait is short.
 
 Off by default, and only offered for files up to a minute.
 
-With it off, the phone changes tempo and key while playing: instant, and good
-enough for one or two semitones. With it on, the whole loop is recomputed
+With it off, the phone does the work as the loop plays: nothing is prepared in
+advance, so pressing play is instant, and it is good enough for one or two
+semitones. With it on, the whole loop is recomputed
 before playing - better sound, especially for larger shifts, at the cost of a
 wait.
 
@@ -227,6 +232,34 @@ and the app will tell you what the file you picked actually contains.
 
 The trimmer saves either a .mid, which stays adjustable in tempo and key
 forever, or a .wav, which plays anywhere without a SoundFont.
+
+# Midi Mixer
+
+Only for scores, in the place where Hi-Fi sits for audio, because on a score
+Hi-Fi has nothing to offer: tempo and key are changed in the notes themselves,
+so there is no better and worse way of doing it. What a score can do instead is
+leave an instrument out.
+
+Tap it and the loop stops, on purpose. A score is played from a rendering
+prepared in advance, so changing what is in it means preparing it again, and
+those few seconds of silence should be something you asked for at a moment you
+chose - not something that happens to you halfway through a bar. Untick the
+instruments you want gone, press Apply, and press Play: it comes back in at the
+bar you left it on.
+
+Switching an instrument off is exact, and this is the one place where the app
+can promise that. Nothing is filtered or subtracted: those notes are simply not
+played. Removing an instrument from a recording is a completely different
+problem and this app does not attempt it.
+
+One thing to expect: what remains gets a little louder. Every rendering is
+levelled to just under the maximum, so taking out a loud instrument leaves more
+room for the others and they come back up to fill it. Nothing has been changed
+about them - the loop as a whole is simply no longer as loud as it was, and is
+levelled back up.
+
+The choice is remembered per track, like the speed and the key. Playing the
+melody yourself over the rest of the band is a thing you come back to.
 
 # Suggestions and Bugs
 

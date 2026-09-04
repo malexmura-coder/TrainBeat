@@ -35,21 +35,28 @@ class TrackPrefs(private val file: File) {
         val favourite: Boolean = false,
         val speed: Float = 1.0f,
         val semitones: Int = 0,
-        val train: Float = 0f
+        val train: Float = 0f,
+        /** The MIDI mixer's channel mask. Meaningless, and always ALL, for audio. */
+        val voices: Int = Instruments.ALL
     ) {
         /** True when there is nothing worth writing down any more. */
         val empty: Boolean
-            get() = !favourite && speed == 1.0f && semitones == 0 && train == 0f
+            get() = !favourite && speed == 1.0f && semitones == 0 && train == 0f &&
+                voices == Instruments.ALL
 
+        // A SEVENTH column, appended rather than inserted, so that a file written by
+        // an earlier version still parses: six fields means every instrument on,
+        // which is exactly what those tracks were played with.
         fun serialise(): String = listOf(
             esc(uri), esc(name), if (favourite) "1" else "0",
-            speed.toString(), semitones.toString(), train.toString()
+            speed.toString(), semitones.toString(), train.toString(), voices.toString()
         ).joinToString("\t")
 
         override fun equals(other: Any?): Boolean {
             if (other !is Entry) return false
             return uri == other.uri && name == other.name && favourite == other.favourite &&
-                speed == other.speed && semitones == other.semitones && train == other.train
+                speed == other.speed && semitones == other.semitones && train == other.train &&
+                voices == other.voices
         }
 
         override fun hashCode(): Int = uri.hashCode()
@@ -67,7 +74,8 @@ class TrackPrefs(private val file: File) {
                         favourite = f[2] == "1",
                         speed = f[3].toFloat(),
                         semitones = f[4].toInt(),
-                        train = f[5].toFloat()
+                        train = f[5].toFloat(),
+                        voices = if (f.size > 6) f[6].toInt() else Instruments.ALL
                     )
                 } catch (_: Exception) {
                     null
@@ -143,14 +151,28 @@ class TrackPrefs(private val file: File) {
                 favourite = now,
                 speed = old?.speed ?: 1.0f,
                 semitones = old?.semitones ?: 0,
-                train = old?.train ?: 0f
+                train = old?.train ?: 0f,
+                voices = old?.voices ?: Instruments.ALL
             )
         )
         return now
     }
 
     /** Remembers how a track was last played, keeping the star as it was. */
-    fun remember(uri: String, name: String, speed: Float, semitones: Int, train: Float) {
+    fun remember(
+        uri: String,
+        name: String,
+        speed: Float,
+        semitones: Int,
+        train: Float,
+        /**
+         * Null means "leave the mask as it was", which is what an audio caller
+         * means. A default of ALL would have been a default that destroys: any
+         * caller not thinking about the mixer would quietly switch every
+         * instrument back on.
+         */
+        voices: Int? = null
+    ) {
         val old = get(uri)
         put(
             Entry(
@@ -159,7 +181,8 @@ class TrackPrefs(private val file: File) {
                 favourite = old?.favourite ?: false,
                 speed = speed,
                 semitones = semitones,
-                train = train
+                train = train,
+                voices = voices ?: old?.voices ?: Instruments.ALL
             )
         )
     }

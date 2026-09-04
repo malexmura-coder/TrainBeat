@@ -119,6 +119,22 @@ class Score(
     }
 
     /**
+     * The same score with some channels not sounding.
+     *
+     * The LENGTH is deliberately untouched. endTick, the tempo map and the time
+     * signatures all stay exactly as they were, so silencing the instrument that
+     * happened to play the last note does not shorten the loop - which would change
+     * where the seam falls and quietly put the whole thing out of time.
+     *
+     * Everything else is left in too: programs, controllers, and the notes of the
+     * channels that remain. What is removed is only what would have sounded.
+     */
+    fun onlyChannels(mask: Int): Score {
+        if (usedChannels.all { Instruments.isOn(mask, it) }) return this
+        return copy(notes = notes.filter { Instruments.isOn(mask, it.channel) })
+    }
+
+    /**
      * Cuts the score between two ticks. Notes that straddle the start are dropped
      * (a note that began before the loop did would sound like a mistake at every
      * repeat); notes that overrun the end are clipped.

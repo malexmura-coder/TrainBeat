@@ -18,6 +18,10 @@ soundfonts/
 *.SF2
 *.sf3
 
+# ...except the one that ships inside the app: Chaos Bank V1.9, 12 MB, CC0 (see the
+# README and the Manual for the credit)
+!app/src/main/assets/builtin/chaosbank.sf2
+
 
 # bench material and its renders
 tools/*.jar

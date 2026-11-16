@@ -1,0 +1,7 @@
+A staff and a tablature view for scores, with a cursor that follows the music and a full-screen mode.
+
+MusicXML and Guitar Pro 3, 4 and 5 files open like MIDI files, with repeats and endings played.
+
+A metronome and a count-in.
+
+A small SoundFont and a few example loops come with the app, so MIDI plays from the first start. A SoundFont of your own still takes precedence.

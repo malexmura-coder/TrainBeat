@@ -1,0 +1,77 @@
+TrainBeat - to do for the next release
+
+1. Staff notation: what is left after the first version
+   - Known limits of the first version (see the header of Notation.kt): rhythm is
+     put on a grid of sixteenth notes, so triplets and thirty-second notes come out
+     wrong; no beams (flags only); one line of music per staff, so a held note under
+     a moving one is cut short; the drum channel is not drawn.
+   - Paged scrolling (StaffPaging.kt): the page stays put, the cursor walks through
+     the visible bars and the page turns as the last visible bar (at least half on
+     screen) is entered. Known limit: the time signature in the header is that of
+     the first bar of the page, stale if the metre changes in mid-page.
+   - Not seen on a device yet: the page turn, spacing at different widths and on a tablet (the size
+     follows the screen until set by hand, 70%-250%, see StaffScale.kt - the
+     automatic default is only a guess until tried on a tablet), the grand staff
+     height, and how a hand-played (unquantised) file reads.
+   - Possible next steps, none decided: triplets, beams, an option for the staff
+     spacing, drawing the drums on a percussion staff.
+   - Guitar Pro 3/4/5 (.gp3, .gp4, .gp5): GuitarPro.kt, same Score + TabScore as the
+     MusicXML reader, same repeat policy (repeats and voltas unrolled by RepeatPlan,
+     a repeated section listed twice in the bars; GP3/4 store the number of repeats, GP5
+     the number of passes; endings after the first are as long as the first, or until
+     the next ending / repeat sign). Written
+     from the published description of the format and checked note for note against
+     files made by Guitar Pro (not kept in the repo). Not read: dead notes, grace notes,
+     bends, slides, hammer-ons, harmonics, trills, strums. No intent filter in the
+     manifest (there is no MIME type for it): open from the app's own lists.
+   - MusicXML (.musicxml, .xml, .mxl): read into the same Score as a MIDI file (see
+     the header of MusicXml.kt), repeats and voltas unrolled (RepeatPlan), a part that
+     carries string and fret shown as a TABLATURE (Tab.kt, TabView.kt) and any other
+     part as a staff. Known limits: no grace notes, cue notes, ornaments, bends,
+     slides or techniques; triplets and thirty-second notes drawn as the nearest plain
+     value; timewise scores refused; a short measure is padded to the signature unless
+     the file marks it implicit; parts beyond the fifteenth are dropped. Not seen on a
+     device yet: the tablature spacing and clef, and real files from MuseScore,
+     TuxGuitar and Guitar Pro exports (only hand-written test scores so far).
+   - A plain .xml is accepted by the library scan: one that is not a score is skipped
+     silently on every scan (it is read again each time, cheap but not free).
+
+2. Release housekeeping
+   - Bump versionCode and versionName, add
+     fastlane/metadata/android/en-US/changelogs/<versionCode>.txt, and list in it
+     everything that was improved in this release.
+   - Already done in the working tree, not yet tested on a device or committed - they
+     go in the changelog:
+       * 4-click count-in before the first start of a track with a known tempo
+       * playback notification: permission asked when playback starts, MediaStyle
+         bound to the media session (reviewer request on F-Droid MR !46733)
+       * screen content kept inside the system bars (edge-to-edge insets; same
+         reviewer request)
+       * staff notation for MIDI files, as an alternative to the info card in the
+         player, with a size setting that follows the screen by default (tablets) and
+         page-by-page scrolling; the player's side margins went from 20 dp to 10 dp
+       * MusicXML files (.musicxml, .xml, .mxl) open like MIDI, with a tablature
+         for guitar and bass parts that carry string and fret
+       * Guitar Pro 3-5 files (.gp3, .gp4, .gp5) open the same way
+       * optional metronome in the Midi Mixer, off until switched on
+       * a more compact player: one-line title, smaller round buttons and lower
+         Play / key buttons, no "Ready" line (Play says Processing meanwhile)
+       * Midi Mixer is a clickable line under the Info / Staff-Tab buttons, with the
+         part to display (staff or tab) on the same line; smaller size buttons, a
+         shorter progress bar
+       * tap on the staff / tab = full screen on black (system bars hidden, tap =
+         play / pause, back gesture or "< Back" leaves); StaffFullScreen.kt
+       * first page after a start (once per process, not on rotation; skipped when a
+         file is sent in or something is playing): free, no ads, hobby project and
+         beta, feedback address, open source on GitHub; tap anywhere to continue
+       * repeats and voltas are played (GP3/4/5 and MusicXML), unrolled: the staff and
+         the tab show the repeated section twice; RepeatPlan in MusicXml.kt, tests in
+         RepeatPlanTest / GuitarProTest / MusicXmlTest (the GP samples now run 1,2,1,3,4)
+       * built-in examples: assets/builtin (3 MIDI, 6 MP3, 1 WAV, 1 gp3, Chaos Bank sf2,
+         CC0 per rKhive) copied to noBackupFilesDir, entered into the library from assets/builtin/loops.tsv
+         (author's tempo and key, nothing measured; scores parsed) by BuiltIn.kt,
+         removable in the library, restorable in Folders; built-in SoundFont used when
+         the user has chosen none ("Use built-in" returns to it); "Play File From
+         Library" is the first Home button; manual updated, credits added
+   - Tag only after the F-Droid MR is merged; UpdateCheckMode: Tags then picks the
+     new tag up by itself.

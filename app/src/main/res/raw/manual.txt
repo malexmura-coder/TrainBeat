@@ -31,10 +31,29 @@ says so rather than pretending. The file still plays.
 
 # Play File From Library
 
-The same player, over the folders you granted, with the tempo and the key
-already known. Search by name, or narrow by tempo range and by key. The
-half/double switch also accepts tracks at half or twice the tempo you asked
-for, which is usually what you meant.
+The first button on the home page. The same player, over the folders you
+granted and the built-in examples, with the tempo and the key already known.
+Search by name, or narrow by tempo range and by key. The half/double switch
+also accepts tracks at half or twice the tempo you asked for, which is usually
+what you meant.
+
+# Built-In Examples
+
+The app comes with a few example loops - MIDI files, MP3 and WAV audio and a
+Guitar Pro tab - and with a SoundFont, so that there is something to play and
+hear on a fresh install, before any folder has been chosen.
+
+The loops live in a private place of the app, apart from your folders, and are
+listed in the library with the rest. Their tempo and key are written down in the
+app, as the author gives them, so nothing is measured when you start it.
+
+They are yours to remove: in the library, Remove on an example takes it out of
+the list and deletes the app's own copy. Nothing else is touched. Folders has a
+Restore examples button that brings back the ones you removed.
+
+The built-in SoundFont is what a MIDI file is played with until you choose one
+of your own under Folders. Yours takes precedence; Use built-in goes back to the
+built-in one. It is small, and a larger General MIDI bank will sound better.
 
 # Speed, Transpose, Train
 
@@ -155,7 +174,11 @@ and work on that.
 
 Four separate things, asked once each and remembered. The library folders are
 read only. The loop destination is where the trimmer writes, the recordings
-folder is where the recorder writes, and the SoundFont is for MIDI.
+folder is where the recorder writes, and the SoundFont is for MIDI: the app has
+one of its own, and a .sf2 chosen here is used instead of it.
+
+The same page has Restore examples, for the built-in loops (see Built-In
+Examples).
 
 # Scan Library
 
@@ -226,9 +249,43 @@ swung, and none of these divisions is approximate: a score counts in ticks, so
 a third of a bar is an exact number of them.
 
 But a score says which notes, not how they sound, so it needs a SoundFont. The
-app ships none: choose a .sf2 yourself in Folders. Be careful which one - some
-.sf2 files are effects-only supplements with no instruments in them at all,
-and the app will tell you what the file you picked actually contains.
+app has a small one built in, so MIDI plays from the first start. For a better
+sound choose a .sf2 of your own in Folders, which is used instead. Be careful
+which one - some .sf2 files are effects-only supplements with no instruments in
+them at all, and the app will tell you what the file you picked actually
+contains.
+
+# Scores From Other Programs
+
+Besides .mid, the app opens MusicXML files (.musicxml, .mxl, .xml) and Guitar
+Pro 3, 4 and 5 files (.gp3, .gp4, .gp5). They are played and shown like a MIDI
+file. Guitar Pro 6 and 7 are not supported.
+
+Repeats are followed. A section between repeat signs is played as many times as
+the sign says, two when it says nothing, and each ending of a volta is played
+on its own pass: the first ending the first time, the second ending the second
+time. The staff and the tablature show the piece as it is played, so a repeated
+section appears twice, one after the other, and the cursor only ever moves
+forward. D.C., D.S. and coda are not followed. A piece with repeats is longer
+than the written music, and the whole of it counts towards the limit on the
+length of a track.
+
+Some details of a Guitar Pro tab are not played and not shown: dead notes,
+grace notes, bends, slides, hammer-ons, harmonics, trills and strums.
+
+# Staff and Tablature
+
+On a score, the Info and Staff buttons switch the page between the information
+card and the music. The staff shows one part at a time - pick the part - with a
+red cursor following the music. A part written for a fretboard is shown as a
+tablature, with string and fret on every note. The size buttons make the
+drawing smaller or larger.
+
+The staff scrolls in pages: the cursor walks through the bars on view and the
+page turns as the last one begins. Tap the staff to see it alone on the whole
+screen, on black; there, a tap is play and pause, and the back gesture or the
+< Back button leaves. The player always opens on the Info page, because only
+that page warns about a track that is too long to be played whole.
 
 The trimmer saves either a .mid, which stays adjustable in tempo and key
 forever, or a .wav, which plays anywhere without a SoundFont.
@@ -261,11 +318,25 @@ levelled back up.
 The choice is remembered per track, like the speed and the key. Playing the
 melody yourself over the rest of the band is a thing you come back to.
 
+The mixer also holds a metronome: a click on every beat, following the tempo and
+the metre of the score. It starts switched off. When a track with a known tempo
+is started for the first time after opening it, four clicks count you in.
+
 # Suggestions and Bugs
 
 Written by A. Mura, 2026. It is free software under the GPL v3, and the source
-is on GitHub.
+is on GitHub: search for it there.
+
+The app is free: no ads, no in-app purchases, no feature behind a payment. It is
+a first app, by one person, and still a beta. Comments are the way it gets
+better.
 
 Suggestions, bug reports and requests are welcome:
 
 m.alex.mura@gmail.com
+
+# Credits
+
+The built-in SoundFont is Chaos Bank V1.9 (1999) by Seong-Jin Yun ("Cyber Punk
+Yun", Chaos Club, Taejon, Korea). It is distributed by rKhive under the CC0 1.0
+public domain dedication; the notice is at https://rkhive.com/legal.html.

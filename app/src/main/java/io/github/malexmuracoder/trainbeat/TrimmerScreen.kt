@@ -163,7 +163,7 @@ fun TrimmerScreen(player: LoopPlayer, onBack: () -> Unit) {
         message = ""
         try {
             if (isMidi) {
-                val sc = withContext(Dispatchers.IO) { MidiFile.loadScore(ctx, Uri.parse(u)) }
+                val sc = withContext(Dispatchers.IO) { MidiFile.loadScore(ctx, Uri.parse(u), name) }
                 val info = MidiAnalysis.analyse(sc)
                 score = sc
                 midiInfo = info

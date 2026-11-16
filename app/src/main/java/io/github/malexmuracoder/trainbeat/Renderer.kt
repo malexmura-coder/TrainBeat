@@ -100,7 +100,10 @@ object Renderer {
     ): Synth.Result {
         // Muted first, transposed second: the notes that will not be heard should
         // not be moved, and dropping them first is also the cheaper order.
-        val heard = score.onlyChannels(voices)
+        val muted = score.onlyChannels(voices)
+        // the click is added to what is left, so that silencing the drums does not
+        // silence it and it is never transposed (it is on the drum channel)
+        val heard = if (Instruments.metronomeOn(voices)) muted.withMetronome() else muted
         val used = if (semitones == 0) heard else heard.transpose(semitones)
         return Synth.render(used, sf, sampleRate, speed.toDouble(), cancelled, progress)
     }

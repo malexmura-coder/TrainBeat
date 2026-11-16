@@ -1,15 +1,19 @@
 package io.github.malexmuracoder.trainbeat
 
+import android.Manifest
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -27,8 +31,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -70,8 +76,12 @@ import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import io.github.malexmuracoder.trainbeat.ui.theme.TrainBeatTheme
 import kotlinx.coroutines.Dispatchers
@@ -109,8 +119,9 @@ private fun Context.hostActivity(): ComponentActivity? {
     return null
 }
 
-/** Where we are. Four entries from the home screen, plus the player. */
+/** Where we are. The first page, the home screen with its entries, and the player. */
 sealed class Route {
+    object Splash : Route()
     object Home : Route()
     object Folder : Route()
     object Library : Route()
@@ -121,6 +132,17 @@ sealed class Route {
     object Favourites : Route()
     object Manual : Route()
     data class Play(val uri: String, val name: String) : Route()
+}
+
+/**
+ * Whether the first page has been dealt with in this process.
+ *
+ * It is shown once per start of the app, not on every rotation or return: the activity is
+ * rebuilt for far less than a new start, and a page that asks to be tapped away each time
+ * the phone turns sideways would be a nuisance rather than a welcome.
+ */
+object Welcome {
+    var seen = false
 }
 
 class MainActivity : ComponentActivity() {
@@ -150,10 +172,25 @@ class MainActivity : ComponentActivity() {
             arrival.value = Incoming.from(this, intent)
             consume(intent)
         }
+        // Edge to edge, declared rather than left to the system. From Android 15 the
+        // app is drawn under the status and navigation bars whether it likes it or
+        // not (targetSdk 35 and later), and a screen that does not move out of the
+        // way puts its first line under the clock. Declaring it makes older versions
+        // behave the same, so there is one layout to check and not two; the bar
+        // icons follow the system light or dark setting, like the theme does.
+        enableEdgeToEdge()
+        // the loops and the SoundFont that come with the app: copied once, measured
+        // at each start (a few files), in the background
+        BuiltIn.prepareAsync(applicationContext)
         setContent {
             TrainBeatTheme {
+                // The background fills the whole window, bars included; the content
+                // is pushed inside the safe area. One place, so no screen - present or
+                // future - has to remember to do it.
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    AppRoot(player, arrival)
+                    Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+                        AppRoot(player, arrival)
+                    }
                 }
             }
         }
@@ -221,10 +258,16 @@ private fun AppRoot(player: LoopPlayer, arrival: State<Arrival?>) {
     // home page with sound coming out of the phone leaves the user holding a
     // control that has no visible relation to what they can hear. So if something
     // is playing, that is where we are.
+    //
+    // On a plain start from the launcher the first page comes first. Not when something
+    // is playing, and not when a file has been sent in: that person asked for music, and
+    // a page in between is in the way. Those starts count as having seen it, so that a
+    // rotation later does not bring it back.
     var route by remember {
-        mutableStateOf<Route>(
-            Playback.nowPlaying?.let { Route.Play(it.uri, it.name) } ?: Route.Home
-        )
+        val start: Route = Playback.nowPlaying?.let { Route.Play(it.uri, it.name) }
+            ?: if (!Welcome.seen && arrival.value == null) Route.Splash else Route.Home
+        if (start != Route.Splash) Welcome.seen = true
+        mutableStateOf(start)
     }
     val back = { route = Route.Home }
 
@@ -239,7 +282,8 @@ private fun AppRoot(player: LoopPlayer, arrival: State<Arrival?>) {
      * Registered BEFORE the screens, so that a screen with something of its own to
      * close - the mixer - is asked first, and this runs only if nothing did.
      */
-    BackHandler(enabled = route != Route.Home) { back() }
+    // The first page is left like home: back there is the end of the app, not a step up.
+    BackHandler(enabled = route != Route.Home && route != Route.Splash) { back() }
 
     /**
      * A file sent in from outside, not yet answered for.
@@ -266,6 +310,12 @@ private fun AppRoot(player: LoopPlayer, arrival: State<Arrival?>) {
     }
 
     when (val r = route) {
+        is Route.Splash -> SplashScreen(
+            onContinue = {
+                Welcome.seen = true
+                route = Route.Home
+            }
+        )
         is Route.Home -> HomeScreen(
             onFolder = { route = Route.Folder },
             onLibrary = { route = Route.Library },
@@ -424,8 +474,8 @@ private fun HomeScreen(
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
         Text("TrainBeat", fontSize = 26.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(18.dp))
-        HomeButton("Play File From Folder", onFolder)
         HomeButton("Play File From Library", onLibrary)
+        HomeButton("Play File From Folder", onFolder)
         HomeButton("Play From Favourites", onFavourites)
         HomeButton("Folders", onFolders)
         HomeButton("Scan Library", onScan)
@@ -459,23 +509,94 @@ private fun HomeScreen(
             modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
-                modifier = Modifier
-                    .size(76.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFF3E6D0)),          // the enamel-sign cream
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.ic_launcher_fg),
-                    contentDescription = "TrainBeat",
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+            AppMark(76.dp)
             Spacer(Modifier.height(8.dp))
             Text(
                 "A. Mura, 2026",
                 fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/** The icon on its round cream ground: the same mark on the first page and on home. */
+@Composable
+private fun AppMark(size: Dp) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Color(0xFFF3E6D0)),              // the enamel-sign cream
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(R.drawable.ic_launcher_fg),
+            contentDescription = "TrainBeat",
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+/**
+ * The first page after a start: what the app is, what it costs, and that it is a first
+ * app by one person and still a beta.
+ *
+ * It waits for a tap, anywhere on the screen, so that the text is read and not raced past.
+ * It scrolls, because in landscape on a phone the text is taller than the screen.
+ */
+@Composable
+private fun SplashScreen(onContinue: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onContinue
+            )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            AppMark(110.dp)
+            Spacer(Modifier.height(16.dp))
+            Text("TrainBeat", fontSize = 30.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(20.dp))
+            // not wider than a comfortable line, on a tablet
+            Column(
+                modifier = Modifier.widthIn(max = 520.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "TrainBeat is free: no ads, no in-app purchases, no paid features.",
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "It is a hobby project, my first app, and still a beta. If something " +
+                        "is broken or missing, write to m.alex.mura@gmail.com and I will " +
+                        "try to improve it. A rating is welcome, but a message tells me more.",
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Open source: find it on GitHub.",
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+            Spacer(Modifier.height(28.dp))
+            Text(
+                "Tap to continue",
+                fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -576,7 +697,7 @@ private fun FolderScreen(onBack: () -> Unit, onOpen: (String, String) -> Unit) {
  * on purpose and not so much that it swallows taps meant for the row.
  */
 @Composable
-fun Star(on: Boolean, onToggle: () -> Unit) {
+fun Star(on: Boolean, verticalPadding: Dp = 4.dp, onToggle: () -> Unit) {
     Text(
         if (on) "\u2605" else "\u2606",
         fontSize = 22.sp,
@@ -584,7 +705,7 @@ fun Star(on: Boolean, onToggle: () -> Unit) {
         else MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
             .clickable { onToggle() }
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(horizontal = 8.dp, vertical = verticalPadding)
     )
 }
 
@@ -606,6 +727,13 @@ private fun PlayerScreen(
 
     val io = rememberCoroutineScope()
     val isMidi = remember(name) { MidiFile.isMidi(name) }
+
+    // The notification permission, asked when a loop starts (see togglePlay). The
+    // answer changes nothing about the sound; it only makes the service redo its
+    // notification, which was posted a moment ago before the user had decided.
+    val askNotification = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { Playback.changed(ctx) }
 
     // NOT keyed on uri, and that is the whole point. With remember(uri) a new track
     // gets a NEW slot while the old slot - holding ninety six megabytes of the
@@ -640,6 +768,20 @@ private fun PlayerScreen(
         if (n != null && n.uri == uri && player.isPlaying) n.positionMs else -1L
     }
     var autoResume by remember(uri) { mutableStateOf(resumeAt >= 0L) }
+
+    /**
+     * Has this screen, for this track, ever actually started the loop.
+     *
+     * Seeded from the same test as autoResume and not from false: a screen
+     * rebuilt by the system while the loop was already playing is a resume, not
+     * a first start, even though the composable itself is brand new. Once true
+     * it stays true for the life of this screen - a pause, a seek, or the mixer
+     * closing are all "play again", never "the first time" a second time.
+     */
+    var hasPlayedOnce by remember(uri) { mutableStateOf(resumeAt >= 0L) }
+
+    /** A count-in is currently sounding. Setting this false cancels it. */
+    var counting by remember(uri) { mutableStateOf(false) }
 
     /**
      * Where in the piece the loop is, and where the next Play will come in.
@@ -678,6 +820,24 @@ private fun PlayerScreen(
      * leave the music stopped for a reason that is no longer on screen.
      */
     var mixerOpen by rememberSaveable(uri) { mutableStateOf(false) }
+
+    /**
+     * Whether a score is shown as a staff instead of the info card, and which part.
+     *
+     * The choice of part is per track (-1 means the first one that is not drums).
+     * Both are keyed on the file: every file opens on the info card, which is where
+     * a refusal (a loop too long to render, a damaged file) is announced, and not on
+     * a staff that may have been left on by the previous file. A rotation or a return
+     * to the app keeps the same file, so it keeps the choice.
+     */
+    var showStaff by rememberSaveable(uri) { mutableStateOf(false) }
+    var staffChannel by rememberSaveable(uri) { mutableStateOf(-1) }
+
+    /**
+     * The staff or tablature alone on the whole screen, entered by tapping it. Saveable,
+     * so that turning the device - which is what this view is for - does not leave it.
+     */
+    var fullScreen by rememberSaveable(uri) { mutableStateOf(false) }
 
     /**
      * Back closes the mixer before it leaves the screen, which is what the gesture
@@ -771,7 +931,7 @@ private fun PlayerScreen(
             val manual = found.second?.manualKey
             keySel = if (manual != null) Analyzer.keyIndex(manual).takeIf { it >= 0 } else null
             if (isMidi) {
-                val parsedScore = withContext(Dispatchers.IO) { MidiFile.loadScore(ctx, parsed) }
+                val parsedScore = withContext(Dispatchers.IO) { MidiFile.loadScore(ctx, parsed, name) }
                 score = parsedScore
                 midiInfo = MidiAnalysis.analyse(parsedScore)
                 if (SoundFontStore.isSet(ctx)) {
@@ -908,6 +1068,7 @@ private fun PlayerScreen(
      * from the bar you were on rather than from the top.
      */
     val pause = {
+        counting = false     // cancels a count-in in progress; ClickPlayer polls this
         player.stop()
         trainer?.close()
         trainer = null
@@ -948,342 +1109,522 @@ private fun PlayerScreen(
         onDispose { Playback.release(keys) }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-    ) {
-        TextButton(
-            onClick = { pause(); onBack() },
-            contentPadding = PaddingValues(0.dp)
-        ) { Text("< Home", fontSize = 18.sp) }
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 10.dp, vertical = 12.dp)
+        ) {
+            TextButton(
+                onClick = { pause(); onBack() },
+                modifier = Modifier.height(26.dp),
+                contentPadding = PaddingValues(0.dp)
+            ) { Text("< Home", fontSize = 18.sp) }
 
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                name,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                modifier = Modifier.weight(1f)
-            )
-            Star(starred) {
-                starred = LibraryFolders.prefs(ctx).toggleFavourite(uri, name)
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    name,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Star(starred, verticalPadding = 0.dp) {
+                    starred = LibraryFolders.prefs(ctx).toggleFavourite(uri, name)
+                }
             }
-        }
-        Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(2.dp))
 
-        val c = clip
-        val sc = score
-        val st = stream
-        val lengthMs = trackMillis()
-        val hqPossible = sc == null && lengthMs in 1..AudioClip.LOOP_MAX_MS
-        val ready = c != null || sc != null ||
-            (st != null && st.frames > st.sampleRate / 2)
+            val c = clip
+            val sc = score
+            val st = stream
+            val lengthMs = trackMillis()
+            val hqPossible = sc == null && lengthMs in 1..AudioClip.LOOP_MAX_MS
+            val ready = c != null || sc != null ||
+                (st != null && st.frames > st.sampleRate / 2)
 
-        when {
-            loading -> Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp))
-                Text(if (isMidi) "  Reading" else "  Opening", fontSize = 14.sp)
-            }
+            when {
+                loading -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp))
+                    Text(if (isMidi) "  Reading" else "  Opening", fontSize = 14.sp)
+                }
 
-            error != null -> Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    Modifier
-                        .padding(12.dp)
-                        .heightIn(max = 420.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    Text("Cannot play this file", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    SelectionContainer {
-                        Text(error ?: "", fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                error != null -> Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        Modifier
+                            .padding(12.dp)
+                            .heightIn(max = 420.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text("Cannot play this file", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        SelectionContainer {
+                            Text(error ?: "", fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        }
+                        if (isMidi && !sfSet) {
+                            Spacer(Modifier.height(8.dp))
+                            Button(onClick = { sfPicker.launch(arrayOf("*/*")) }) { Text("Choose .sf2") }
+                        }
                     }
-                    if (isMidi && !sfSet) {
+                }
+
+                sc != null && !sfSet -> Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text("MIDI needs a SoundFont", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text("A score says which notes, not how they sound.",
+                            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(8.dp))
-                        Button(onClick = { sfPicker.launch(arrayOf("*/*")) }) { Text("Choose .sf2") }
+                        Button(
+                            onClick = { sfPicker.launch(arrayOf("*/*")) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Choose .sf2", fontSize = 15.sp) }
                     }
                 }
-            }
 
-            sc != null && !sfSet -> Card(modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp)) {
-                    Text("MIDI needs a SoundFont", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Text("A score says which notes, not how they sound.",
-                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(8.dp))
-                    Button(
-                        onClick = { sfPicker.launch(arrayOf("*/*")) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("Choose .sf2", fontSize = 15.sp) }
-                }
-            }
-
-            ready -> {
-                Stepper(
-                    label = "Speed",
-                    value = Ramp.speedLabel(speed),
-                    enabled = !playing && !preparing,
-                    onMinus = { speed = (speed - Ramp.SPEED_STEP).coerceAtLeast(Ramp.SPEED_MIN) },
-                    onPlus = { speed = (speed + Ramp.SPEED_STEP).coerceAtMost(Ramp.SPEED_MAX) }
-                )
-                Stepper(
-                    label = "Transpose",
-                    value = Ramp.pitchLabel(pitch),
-                    enabled = !playing && !preparing,
-                    onMinus = { if (pitch > Ramp.PITCH_MIN) pitch-- },
-                    onPlus = { if (pitch < Ramp.PITCH_MAX) pitch++ }
-                )
-                Stepper(
-                    label = "Train",
-                    value = Ramp.trainLabel(train),
-                    enabled = !playing && !preparing,
-                    onMinus = { train = (train - Ramp.TRAIN_STEP).coerceAtLeast(0f) },
-                    onPlus = { train = (train + Ramp.TRAIN_STEP).coerceAtMost(Ramp.TRAIN_MAX) }
-                )
-
-                if (sc == null) {
-                    if (hqPossible) {
-                        TextButton(
-                            onClick = {
-                                if (!playing && !preparing) { hq = !hq; Renderer.clearCache() }
-                            },
-                            contentPadding = PaddingValues(0.dp)
-                        ) { Text(if (hq) "Hi-Fi: On" else "Hi-Fi: Off", fontSize = 13.sp) }
-                    } else {
-                        Text(
-                            "Too long, Hi-Fi not available",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                } else {
-                    // The same line of the screen, because on a score Hi-Fi has
-                    // nothing to offer - tempo and key are changed in the notes, so
-                    // there is no better and worse way of doing it - while the one
-                    // thing a score CAN do that audio cannot is leave an instrument
-                    // out. One row, one choice, whichever kind of file is open.
-                    MidiMixer(
-                        score = sc,
-                        voices = voices,
-                        open = mixerOpen,
-                        // not while a rendering is in flight: it would finish and
-                        // start playing behind an open mixer, which is the one
-                        // state this design exists to make impossible
-                        onOpen = { if (!preparing) { pause(); mixerOpen = true } },
-                        onToggle = { ch -> voices = Instruments.toggled(voices, ch) },
-                        onApply = { mixerOpen = false }
+                ready -> {
+                    Stepper(
+                        label = "Speed",
+                        buttonSize = 43.dp,
+                        value = Ramp.speedLabel(speed),
+                        enabled = !playing && !preparing && !counting,
+                        onMinus = { speed = (speed - Ramp.SPEED_STEP).coerceAtLeast(Ramp.SPEED_MIN) },
+                        onPlus = { speed = (speed + Ramp.SPEED_STEP).coerceAtMost(Ramp.SPEED_MAX) }
                     )
-                }
+                    Stepper(
+                        label = "Transpose",
+                        buttonSize = 43.dp,
+                        value = Ramp.pitchLabel(pitch),
+                        enabled = !playing && !preparing && !counting,
+                        onMinus = { if (pitch > Ramp.PITCH_MIN) pitch-- },
+                        onPlus = { if (pitch < Ramp.PITCH_MAX) pitch++ }
+                    )
+                    Stepper(
+                        label = "Train",
+                        buttonSize = 43.dp,
+                        value = Ramp.trainLabel(train),
+                        enabled = !playing && !preparing && !counting,
+                        onMinus = { train = (train - Ramp.TRAIN_STEP).coerceAtLeast(0f) },
+                        onPlus = { train = (train + Ramp.TRAIN_STEP).coerceAtMost(Ramp.TRAIN_MAX) }
+                    )
 
-                Spacer(Modifier.height(6.dp))
-                // one definition of "Press play", used by the button on screen and
-                // by the play key on a Bluetooth speaker or a pedal
-                val togglePlay: () -> Unit = {
-                        if (playing) {
-                            pause()
-                        } else if (!preparing && !mixerOpen) {
-                            // ask for the right to make noise, and stop cleanly if it
-                            // is taken away: without this a notification sound can
-                            // kill the loop with no way back
-                            Playback.requestFocus(ctx) { pause() }
-                            // hqPossible already says there is no score, so asking
-                            // again here only made the compiler point out that it
-                            // knew. What is left is the real condition: Hi-Fi was
-                            // asked for, it is allowed, and the file is decoded -
-                            // there is nothing to prepare from a track still arriving.
-                            val useHq = hq && hqPossible && c != null
-                            if (sc == null && !useHq) {
-                                // nothing to prepare: the device does tempo and key
-                                try {
-                                    if (c != null) {
-                                        player.startLive(
-                                            c, speed, pitch, train,
-                                            startAt = Cursor.sampleAt(
-                                                Cursor.frameAt(positionMs, c.frames, c.durationMs),
-                                                c.channels, c.samples.size
-                                            )
-                                        )
-                                    } else if (st != null) {
-                                        // A seek past the decoder is allowed here and
-                                        // simply waits: the decoder runs many times
-                                        // faster than the music, so the wait is short
-                                        // and it is a truer answer than starting over.
-                                        val chans = st.channels.coerceAtLeast(1)
-                                        player.startStream(
-                                            st, speed, pitch, train,
-                                            startAt = Cursor.sampleAt(
-                                                Cursor.frameAt(
-                                                    positionMs, st.expectedSamples / chans, st.expectedMs),
-                                                chans, st.expectedSamples
-                                            )
-                                        )
-                                    }
-                                    liveSpeed = speed
-                                    liveLoop = 0
-                                    playing = true
-                                    Playback.began(ctx, uri, name)
-                                } catch (e: Throwable) {
-                                    error = e.message ?: e.javaClass.simpleName
-                                }
-                            } else {
-                                preparing = true
-                                io.launch {
+                    if (sc == null) {
+                        if (hqPossible) {
+                            TextButton(
+                                onClick = {
+                                    if (!playing && !preparing && !counting) { hq = !hq; Renderer.clearCache() }
+                                },
+                                contentPadding = PaddingValues(0.dp)
+                            ) { Text(if (hq) "Hi-Fi: On" else "Hi-Fi: Off", fontSize = 13.sp) }
+                        } else {
+                            Text(
+                                "Too long, Hi-Fi not available",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(2.dp))
+                    // one definition of "Press play", used by the button on screen and
+                    // by the play key on a Bluetooth speaker or a pedal
+                    // Extracted so a count-in can sit in front of it on the very first
+                    // entry: everything below is exactly what used to run directly from
+                    // togglePlay, unchanged.
+                    val startNow: () -> Unit = {
+                                // hqPossible already says there is no score, so asking
+                                // again here only made the compiler point out that it
+                                // knew. What is left is the real condition: Hi-Fi was
+                                // asked for, it is allowed, and the file is decoded -
+                                // there is nothing to prepare from a track still arriving.
+                                val useHq = hq && hqPossible && c != null
+                                if (sc == null && !useHq) {
+                                    // nothing to prepare: the device does tempo and key
                                     try {
-                                        val first = withContext(Dispatchers.Default) { buffer(speed) }
-                                        if (first.isEmpty()) throw Exception(
-                                            "This SoundFont cannot play these notes")
-                                        val rate = if (sc != null) 44100 else c!!.sampleRate
-                                        val chans = if (sc != null) 2 else c!!.channels
-                                        val tr = if (train > 0f)
-                                            TrainRenderer(speed, train) { s -> buffer(s) } else null
-                                        trainer = tr
-                                        // The entry point is measured against the
-                                        // RENDERED material, which at half speed is
-                                        // twice as long as the file. Measuring it
-                                        // against the file instead is the mistake
-                                        // that lands you at the wrong bar - half way
-                                        // in when you asked for the end.
-                                        player.start(
-                                            rate, chans, first,
-                                            startAt = Cursor.sampleAt(
-                                                Cursor.frameAt(
-                                                    positionMs, first.size / chans, trackMillis()),
-                                                chans, first.size
+                                        if (c != null) {
+                                            player.startLive(
+                                                c, speed, pitch, train,
+                                                startAt = Cursor.sampleAt(
+                                                    Cursor.frameAt(positionMs, c.frames, c.durationMs),
+                                                    c.channels, c.samples.size
+                                                )
                                             )
-                                        ) { loop -> tr?.nextFor(loop) }
+                                        } else if (st != null) {
+                                            // A seek past the decoder is allowed here and
+                                            // simply waits: the decoder runs many times
+                                            // faster than the music, so the wait is short
+                                            // and it is a truer answer than starting over.
+                                            val chans = st.channels.coerceAtLeast(1)
+                                            player.startStream(
+                                                st, speed, pitch, train,
+                                                startAt = Cursor.sampleAt(
+                                                    Cursor.frameAt(
+                                                        positionMs, st.expectedSamples / chans, st.expectedMs),
+                                                    chans, st.expectedSamples
+                                                )
+                                            )
+                                        }
                                         liveSpeed = speed
                                         liveLoop = 0
                                         playing = true
                                         Playback.began(ctx, uri, name)
                                     } catch (e: Throwable) {
                                         error = e.message ?: e.javaClass.simpleName
-                                    } finally {
-                                        preparing = false
+                                    }
+                                } else {
+                                    preparing = true
+                                    io.launch {
+                                        try {
+                                            val first = withContext(Dispatchers.Default) { buffer(speed) }
+                                            if (first.isEmpty()) throw Exception(
+                                                "This SoundFont cannot play these notes")
+                                            val rate = if (sc != null) 44100 else c!!.sampleRate
+                                            val chans = if (sc != null) 2 else c!!.channels
+                                            val tr = if (train > 0f)
+                                                TrainRenderer(speed, train) { s -> buffer(s) } else null
+                                            trainer = tr
+                                            // The entry point is measured against the
+                                            // RENDERED material, which at half speed is
+                                            // twice as long as the file. Measuring it
+                                            // against the file instead is the mistake
+                                            // that lands you at the wrong bar - half way
+                                            // in when you asked for the end.
+                                            player.start(
+                                                rate, chans, first,
+                                                startAt = Cursor.sampleAt(
+                                                    Cursor.frameAt(
+                                                        positionMs, first.size / chans, trackMillis()),
+                                                    chans, first.size
+                                                )
+                                            ) { loop -> tr?.nextFor(loop) }
+                                            liveSpeed = speed
+                                            liveLoop = 0
+                                            playing = true
+                                            Playback.began(ctx, uri, name)
+                                        } catch (e: Throwable) {
+                                            error = e.message ?: e.javaClass.simpleName
+                                        } finally {
+                                            preparing = false
+                                        }
                                     }
                                 }
+                    }
+
+                    /**
+                     * One definition of "Press play", used by the button on screen and by
+                     * the play key on a Bluetooth speaker or a pedal.
+                     *
+                     * A count-in runs first, but only once: at the very first entry of a
+                     * track whose tempo is actually known. A guessed tempo, or none at
+                     * all, would click at a speed that has nothing to do with the music,
+                     * which misleads more than it helps - so those tracks start exactly
+                     * as they always did. Pausing, seeking, or reopening the mixer are
+                     * never "the first time" again: hasPlayedOnce, once true, stays true
+                     * for the life of this screen.
+                     */
+                    val togglePlay: () -> Unit = {
+                            if (playing) {
+                                pause()
+                            } else if (!preparing && !mixerOpen && !counting) {
+                                // Android 13 and later: the playback notification needs the
+                                // permission, and this is the first moment it is wanted.
+                                // Asked once per process, without holding up the sound; when
+                                // the answer comes, the service is refreshed so a notification
+                                // refused a moment ago appears as soon as it is allowed.
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                    !Playback.notificationAsked &&
+                                    ContextCompat.checkSelfPermission(
+                                        ctx, Manifest.permission.POST_NOTIFICATIONS
+                                    ) != PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    Playback.notificationAsked = true
+                                    askNotification.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                                // ask for the right to make noise, and stop cleanly if it
+                                // is taken away: without this a notification sound can
+                                // kill the loop with no way back
+                                Playback.requestFocus(ctx) { pause() }
+
+                                val rec = known
+                                if (!hasPlayedOnce && rec != null && rec.analysed) {
+                                    counting = true
+                                    val bpm = rec.bpm * Ramp.speedAt(speed, train, 0)
+                                    io.launch {
+                                        val played = withContext(Dispatchers.Default) {
+                                            ClickPlayer.play(bpm) { counting }
+                                        }
+                                        counting = false
+                                        if (played) {
+                                            hasPlayedOnce = true
+                                            startNow()
+                                        }
+                                    }
+                                } else {
+                                    hasPlayedOnce = true
+                                    startNow()
+                                }
+                            }
+                            Playback.changed(ctx)
+                    }
+                    SideEffect {
+                        actions.play = togglePlay
+                        actions.stop = { pause() }
+                    }
+
+                    /**
+                     * The loop was already playing when this screen was built, because
+                     * the system had destroyed the previous one. It has been stopped to
+                     * read the file again; carry on from where it was.
+                     */
+                    LaunchedEffect(Unit) {
+                        if (autoResume) {
+                            autoResume = false
+                            togglePlay()
+                        }
+                    }
+
+                    PositionBar(
+                        positionMs = positionMs,
+                        lengthMs = lengthMs,
+                        // while the mixer is open nothing plays, on purpose: the whole
+                        // point of it being open is that a silence was asked for
+                        enabled = !preparing && !mixerOpen && !counting,
+                        onSeek = { ms ->
+                            positionMs = ms
+                            Playback.moved(ms)
+                            // Seeking while it plays is a pause and a fresh entry, which
+                            // is a gap of a moment - and, with Hi-Fi on, of a rendering.
+                            // The alternative is a second playing path with its own
+                            // seam, for a gesture nobody makes twice a bar.
+                            if (playing) { pause(); togglePlay() }
+                        }
+                    )
+
+                    Button(
+                        onClick = togglePlay,
+                        enabled = !preparing && !mixerOpen && !counting,
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            if (playing) "Pause" else if (counting) "Count-in" else if (preparing) "Processing" else "Play",
+                            fontSize = 22.sp, fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Nothing is said when there is nothing to say: the button already
+                    // says Processing or Count-in, and an idle player needs no "Ready".
+                    val status = listOfNotNull(
+                        when {
+                            mixerOpen -> "Stopped for the mixer"
+                            playing -> "${Ramp.speedLabel(liveSpeed)}   loop ${liveLoop + 1}" +
+                                (trainer?.let { if (it.misses > 2) "   behind" else "" } ?: "")
+                            else -> null
+                        },
+                        if (st != null && !st.complete) "Decoding $decoded%" else null
+                    ).joinToString("   ·   ")
+                    if (status.isNotEmpty()) {
+                        Text(
+                            status,
+                            fontSize = 13.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // A score can be read as well as heard. The switch sits right under
+                    // Play, and the staff right under the switch, so that the music and
+                    // the button that starts it are on the same screen.
+                    if (sc != null) {
+                        // a MusicXML score written for a fretboard is read as a tablature
+                        val staffLabel = if (sc.tab != null) "Tab" else "Staff"
+                        Spacer(Modifier.height(6.dp))
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            if (showStaff) {
+                                OutlinedButton(
+                                    onClick = { showStaff = false },
+                                    modifier = Modifier.weight(1f)
+                                ) { Text("Info") }
+                            } else {
+                                Button(onClick = {}, modifier = Modifier.weight(1f)) { Text("Info") }
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            if (showStaff) {
+                                Button(onClick = {}, modifier = Modifier.weight(1f)) { Text(staffLabel) }
+                            } else {
+                                OutlinedButton(
+                                    onClick = { showStaff = true },
+                                    modifier = Modifier.weight(1f)
+                                ) { Text(staffLabel) }
                             }
                         }
-                        Playback.changed(ctx)
-                }
-                SideEffect {
-                    actions.play = togglePlay
-                    actions.stop = { pause() }
-                }
-
-                /**
-                 * The loop was already playing when this screen was built, because
-                 * the system had destroyed the previous one. It has been stopped to
-                 * read the file again; carry on from where it was.
-                 */
-                LaunchedEffect(Unit) {
-                    if (autoResume) {
-                        autoResume = false
-                        togglePlay()
+                        // On a score Hi-Fi has nothing to offer - tempo and key are changed in
+                        // the notes - while the one thing a score CAN do that audio cannot is
+                        // leave an instrument out. So the mixer is here, one line under the
+                        // switch, and the part to read shares that line when there is a
+                        // staff or tablature to read it on.
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            MidiMixerLine(
+                                score = sc,
+                                voices = voices,
+                                // not while a rendering is in flight: it would finish and
+                                // start playing behind an open mixer, which is the one
+                                // state this design exists to make impossible
+                                onOpen = { if (!preparing && !counting) { pause(); mixerOpen = true } },
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            if (showStaff) {
+                                Spacer(Modifier.width(12.dp))
+                                StaffPartPicker(
+                                    score = sc,
+                                    channel = staffChannel,
+                                    onChannel = { staffChannel = it },
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                            }
+                        }
+                        if (mixerOpen) {
+                            MidiMixer(
+                                score = sc,
+                                voices = voices,
+                                onToggle = { ch -> voices = Instruments.toggled(voices, ch) },
+                                onApply = { mixerOpen = false }
+                            )
+                        }
+                        if (showStaff) {
+                            Spacer(Modifier.height(6.dp))
+                            StaffPanel(
+                                score = sc,
+                                semitones = pitch,
+                                positionMs = positionMs,
+                                channel = staffChannel,
+                                onChannel = { staffChannel = it },
+                                onOpenFull = { if (!mixerOpen) fullScreen = true }
+                            )
+                        }
                     }
-                }
 
-                PositionBar(
-                    positionMs = positionMs,
-                    lengthMs = lengthMs,
-                    // while the mixer is open nothing plays, on purpose: the whole
-                    // point of it being open is that a silence was asked for
-                    enabled = !preparing && !mixerOpen,
-                    onSeek = { ms ->
-                        positionMs = ms
-                        Playback.moved(ms)
-                        // Seeking while it plays is a pause and a fresh entry, which
-                        // is a gap of a moment - and, with Hi-Fi on, of a rendering.
-                        // The alternative is a second playing path with its own
-                        // seam, for a gesture nobody makes twice a bar.
-                        if (playing) { pause(); togglePlay() }
-                    }
-                )
-
-                Button(
-                    onClick = togglePlay,
-                    enabled = !preparing && !mixerOpen,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        if (playing) "Pause" else if (preparing) "Rendering" else "Play",
-                        fontSize = 22.sp, fontWeight = FontWeight.Bold
+                    // Correcting the key belongs here: this is where you hear that the
+                    // detected one is wrong. It is saved in the library, keyed by name
+                    // and size, so it survives and the list shows it as certain.
+                    Spacer(Modifier.height(6.dp))
+                    KeyDropdown(
+                        label = null,
+                        value = keySel?.let { Analyzer.KEY_NAMES[it] } ?: "Set Key by Hand",
+                        options = Analyzer.KEY_NAMES.toList(),
+                        onPick = { keySel = it },
+                        height = 40.dp
                     )
+                    Spacer(Modifier.height(4.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Button(
+                            onClick = {
+                                val chosen = keySel?.let { Analyzer.KEY_NAMES[it] } ?: return@Button
+                                io.launch {
+                                    val saved = withContext(Dispatchers.IO) {
+                                        LibraryFolders.saveManualKey(ctx, known, name, size, uri, chosen)
+                                    }
+                                    known = saved
+                                }
+                            },
+                            // nothing to save once the shown key IS the saved one
+                            enabled = keySel != null &&
+                                Analyzer.KEY_NAMES.getOrNull(keySel!!) != known?.manualKey,
+                            modifier = Modifier.weight(1f).height(36.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
+                        ) { Text("Save Key") }
+                        Spacer(Modifier.width(10.dp))
+                        // the same size and the same weight as its neighbour: two halves
+                        // of one decision, each dark only when it has nothing to do
+                        Button(
+                            onClick = {
+                                io.launch {
+                                    val saved = withContext(Dispatchers.IO) {
+                                        LibraryFolders.saveManualKey(ctx, known, name, size, uri, null)
+                                    }
+                                    known = saved
+                                    keySel = null
+                                }
+                            },
+                            enabled = known?.manualKey != null,
+                            modifier = Modifier.weight(1f).height(36.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
+                        ) { Text("Clear") }
+                    }
+
+                    // LAST, and it used to be first. What the file is - its format, its
+                    // tempo, its key - is read once and then never again, while the
+                    // controls above are touched all the time. On a small screen a card
+                    // at the top pushed Play off the bottom of the page, which put a
+                    // scroll between the user and the only button that matters.
+                    Spacer(Modifier.height(14.dp))
+                    if (sc != null) {
+                        if (!showStaff) MidiCard(sc, midiInfo, known, sfSummary ?: sfLabel)
+                    }
+                    else if (c != null) InfoCard(c, known)
+                    else if (st != null) StreamCard(st, known)
                 }
 
-                Text(
-                    when {
-                        preparing -> "Rendering"
-                        mixerOpen -> "Stopped for the mixer"
-                        playing -> "${Ramp.speedLabel(liveSpeed)}   loop ${liveLoop + 1}" +
-                            (trainer?.let { if (it.misses > 2) "   behind" else "" } ?: "")
-                        Renderer.isPlain(speed, pitch) -> "Ready"
-                        else -> "Ready: ${Ramp.speedLabel(speed)}"
-                    } + (if (st != null && !st.complete) "   ·   Decoding $decoded%" else ""),
-                    fontSize = 13.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                // Correcting the key belongs here: this is where you hear that the
-                // detected one is wrong. It is saved in the library, keyed by name
-                // and size, so it survives and the list shows it as certain.
-                Spacer(Modifier.height(6.dp))
-                KeyDropdown(
-                    label = null,
-                    value = keySel?.let { Analyzer.KEY_NAMES[it] } ?: "Set Key by Hand",
-                    options = Analyzer.KEY_NAMES.toList(),
-                    onPick = { keySel = it }
-                )
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Button(
-                        onClick = {
-                            val chosen = keySel?.let { Analyzer.KEY_NAMES[it] } ?: return@Button
-                            io.launch {
-                                val saved = withContext(Dispatchers.IO) {
-                                    LibraryFolders.saveManualKey(ctx, known, name, size, uri, chosen)
-                                }
-                                known = saved
-                            }
-                        },
-                        // nothing to save once the shown key IS the saved one
-                        enabled = keySel != null &&
-                            Analyzer.KEY_NAMES.getOrNull(keySel!!) != known?.manualKey,
-                        modifier = Modifier.weight(1f)
-                    ) { Text("Save Key") }
-                    Spacer(Modifier.width(10.dp))
-                    // the same size and the same weight as its neighbour: two halves
-                    // of one decision, each dark only when it has nothing to do
-                    Button(
-                        onClick = {
-                            io.launch {
-                                val saved = withContext(Dispatchers.IO) {
-                                    LibraryFolders.saveManualKey(ctx, known, name, size, uri, null)
-                                }
-                                known = saved
-                                keySel = null
-                            }
-                        },
-                        enabled = known?.manualKey != null,
-                        modifier = Modifier.weight(1f)
-                    ) { Text("Clear") }
+                else -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp))
+                    Text("  Decoding $decoded%", fontSize = 14.sp)
                 }
-
-                // LAST, and it used to be first. What the file is - its format, its
-                // tempo, its key - is read once and then never again, while the
-                // controls above are touched all the time. On a small screen a card
-                // at the top pushed Play off the bottom of the page, which put a
-                // scroll between the user and the only button that matters.
-                Spacer(Modifier.height(14.dp))
-                if (sc != null) MidiCard(sc, midiInfo, known, sfSummary ?: sfLabel)
-                else if (c != null) InfoCard(c, known)
-                else if (st != null) StreamCard(st, known)
-            }
-
-            else -> Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp))
-                Text("  Decoding $decoded%", fontSize = 14.sp)
             }
         }
+
+        // Over everything, so that the player underneath keeps its place and its state.
+        val whole = score
+        // The refusal ("Cannot play this file", e.g. a loop too long to render) is a card
+        // on the player, which the black overlay would hide: leave the full screen so
+        // that it is seen.
+        LaunchedEffect(error) { if (error != null) fullScreen = false }
+        if (fullScreen && showStaff && whole != null && error == null) {
+            StaffFullScreen(
+                score = whole,
+                semitones = pitch,
+                positionMs = positionMs,
+                channel = staffChannel,
+                // a tap is play or pause; during the count-in it is the pause
+                onTap = { if (playing || counting) pause() else actions.play() },
+                onClose = { fullScreen = false }
+            )
+        }
+    }
+}
+
+/**
+ * The closed mixer: a line of text to click. It says what it is, and admits when it is
+ * doing something (an instrument switched off, the metronome on). Open, it is
+ * [MidiMixer].
+ */
+@Composable
+private fun MidiMixerLine(
+    score: Score,
+    voices: Int,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val parts = remember(score) { Instruments.partsOf(score) }
+    val off = parts.count { !Instruments.isOn(voices, it.channel) }
+    val doing = listOfNotNull(
+        if (off == 1) "1 instrument off" else if (off > 1) "$off instruments off" else null,
+        if (Instruments.metronomeOn(voices)) "metronome on" else null
+    )
+    TextButton(
+        onClick = onOpen,
+        modifier = modifier.height(30.dp),
+        contentPadding = PaddingValues(0.dp)
+    ) {
+        Text(
+            if (doing.isEmpty()) "Midi Mixer" else "Midi Mixer: " + doing.joinToString(", "),
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -1311,26 +1652,13 @@ private fun PlayerScreen(
 private fun MidiMixer(
     score: Score,
     voices: Int,
-    open: Boolean,
-    onOpen: () -> Unit,
     onToggle: (Int) -> Unit,
     onApply: () -> Unit
 ) {
     val parts = remember(score) { Instruments.partsOf(score) }
     val off = parts.count { !Instruments.isOn(voices, it.channel) }
+    val metronome = Instruments.metronomeOn(voices)
 
-    if (!open) {
-        TextButton(onClick = onOpen, contentPadding = PaddingValues(0.dp)) {
-            Text(
-                // says what it is, and admits when it is doing something
-                if (off == 0) "Midi Mixer"
-                else if (off == 1) "Midi Mixer: 1 instrument off"
-                else "Midi Mixer: $off instruments off",
-                fontSize = 13.sp
-            )
-        }
-        return
-    }
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
@@ -1361,6 +1689,24 @@ private fun MidiMixer(
                         else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+
+            // Not an instrument of the score: a click on every beat, off until asked for,
+            // and not counted among the instruments that must not all be off.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onToggle(Instruments.METRONOME) }
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(checked = metronome, onCheckedChange = { onToggle(Instruments.METRONOME) })
+                Text(
+                    "Metronome",
+                    fontSize = 14.sp,
+                    color = if (metronome) MaterialTheme.colorScheme.onSurface
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             if (off == parts.size) {
@@ -1414,6 +1760,8 @@ private fun PositionBar(
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Slider(
+            // 10% lower than the 48 dp the slider takes when left alone
+            modifier = Modifier.height(43.dp),
             value = if (known) shown.coerceIn(0L, lengthMs).toFloat() else 0f,
             valueRange = 0f..(if (known) lengthMs.toFloat() else 1f),
             enabled = enabled && known,
@@ -1488,7 +1836,9 @@ fun Stepper(
     value: String,
     enabled: Boolean,
     onMinus: () -> Unit,
-    onPlus: () -> Unit
+    onPlus: () -> Unit,
+    /** Diameter of the round buttons; the player uses a slightly smaller one. */
+    buttonSize: Dp = 48.dp
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp),
@@ -1497,7 +1847,7 @@ fun Stepper(
         Button(
             onClick = onMinus,
             enabled = enabled,
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier.size(buttonSize),
             contentPadding = PaddingValues(0.dp)
         ) { Text("-", fontSize = 22.sp, fontWeight = FontWeight.Bold) }
 
@@ -1512,7 +1862,7 @@ fun Stepper(
         Button(
             onClick = onPlus,
             enabled = enabled,
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier.size(buttonSize),
             contentPadding = PaddingValues(0.dp)
         ) { Text("+", fontSize = 22.sp, fontWeight = FontWeight.Bold) }
     }
@@ -1528,7 +1878,8 @@ fun KeyDropdown(
     label: String?,
     value: String,
     options: List<String>,
-    onPick: (Int) -> Unit
+    onPick: (Int) -> Unit,
+    height: Dp = 44.dp
 ) {
     var open by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -1539,7 +1890,7 @@ fun KeyDropdown(
         Box {
             OutlinedButton(
                 onClick = { open = true },
-                modifier = Modifier.fillMaxWidth().height(44.dp)
+                modifier = Modifier.fillMaxWidth().height(height)
             ) { Text(value, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                 options.forEachIndexed { i, opt ->

@@ -85,6 +85,17 @@ object Playback {
     val current: Handler? get() = handler
 
     /**
+     * Has the notification permission been asked for in this process already.
+     *
+     * Android 13 and later asks nothing by itself: without the permission the
+     * playback notification is simply not shown. The player asks once, when a loop
+     * starts, and not again until the process is rebuilt - a question repeated on
+     * every Play is a nag, and the system itself stops showing the dialog after
+     * two refusals.
+     */
+    @Volatile var notificationAsked: Boolean = false
+
+    /**
      * The track the loop is on, kept here rather than in the screen that started it.
      *
      * A screen can be destroyed by the system while the loop plays on, and the next
@@ -192,6 +203,21 @@ object Playback {
     }
 
     // ---------------------------------------------------------------- session
+
+    /**
+     * The token the notification hangs its media controls on.
+     *
+     * A notification that carries it is what the system recognises as THE media
+     * notification of this app: it is the one shown on the lock screen and in the
+     * quick settings player, and on Android 13 and later it is exempt from the
+     * notification permission. A plain notification with a Stop button is none of
+     * those. The session is created here if no screen has done it yet, because the
+     * service can be started with no screen alive.
+     */
+    fun sessionToken(ctx: Context): MediaSession.Token? {
+        ensureSession(ctx.applicationContext)
+        return session?.sessionToken
+    }
 
     private fun ensureSession(ctx: Context) {
         if (session != null) return

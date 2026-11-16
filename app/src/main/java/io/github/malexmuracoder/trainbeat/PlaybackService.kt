@@ -153,8 +153,18 @@ class PlaybackService : Service() {
             .setContentText("looping")
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setOngoing(true)
+            .setCategory(Notification.CATEGORY_TRANSPORT)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setContentIntent(open)
             .addAction(Notification.Action.Builder(null, "Stop", stop).build())
+
+        // A media notification, bound to the session. Stop is the only action and
+        // it is the one shown in the compact view; without the token this is just
+        // an ordinary foreground notification, which Android 13 and later hides
+        // unless the user has granted the notification permission.
+        val style = Notification.MediaStyle().setShowActionsInCompactView(0)
+        Playback.sessionToken(this)?.let { style.setMediaSession(it) }
+        b.setStyle(style)
         return b.build()
     }
 

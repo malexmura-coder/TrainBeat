@@ -87,6 +87,9 @@ object Incoming {
             "audio/mp4", "audio/m4a", "audio/x-m4a", "audio/aac", "audio/aacp" -> ".m4a"
             "audio/ogg", "application/ogg", "application/x-ogg", "audio/vorbis" -> ".ogg"
             "audio/opus" -> ".opus"
+            "application/vnd.recordare.musicxml+xml" -> ".musicxml"
+            "application/vnd.recordare.musicxml" -> ".mxl"
+            "application/xml", "text/xml" -> ".xml"
             else -> null
         }
     }
@@ -102,6 +105,9 @@ object Incoming {
             n.endsWith(".m4a") || n.endsWith(".aac") -> "audio/mp4"
             n.endsWith(".ogg") || n.endsWith(".oga") -> "audio/ogg"
             n.endsWith(".opus") -> "audio/opus"
+            n.endsWith(".musicxml") -> "application/vnd.recordare.musicxml+xml"
+            n.endsWith(".mxl") -> "application/vnd.recordare.musicxml"
+            n.endsWith(".xml") -> "application/xml"
             else -> "application/octet-stream"
         }
     }
@@ -153,6 +159,8 @@ object Incoming {
 
     private val KNOWN = listOf(
         ".mid", ".midi", ".kar",
-        ".mp3", ".wav", ".wave", ".flac", ".m4a", ".aac", ".ogg", ".oga", ".opus"
+        ".mp3", ".wav", ".wave", ".flac", ".m4a", ".aac", ".ogg", ".oga", ".opus",
+        ".musicxml", ".mxl", ".xml",
+        ".gp3", ".gp4", ".gp5"
     )
 }

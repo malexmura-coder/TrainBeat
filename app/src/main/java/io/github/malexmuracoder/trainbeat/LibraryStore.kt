@@ -41,7 +41,15 @@ class LibraryStore(private val file: File) {
 
     /** Rewrites the file with one line per track. Safe to call at any time. */
     fun compact() {
-        val records = loadAll()
+        rewrite(loadAll())
+    }
+
+    /** Drops one track from the cache, by its cache key. */
+    fun remove(key: String) {
+        rewrite(loadAll().filter { it.cacheKey != key })
+    }
+
+    private fun rewrite(records: List<TrackRecord>) {
         try {
             val tmp = File(file.parentFile, file.name + ".tmp")
             tmp.writeText(records.joinToString("\n") { it.serialise() } + if (records.isEmpty()) "" else "\n")

@@ -3,9 +3,9 @@ package io.github.malexmuracoder.trainbeat
 /**
  * SoundFont 2 reader.
  *
- * The app ships no SoundFont: the user picks a .sf2 with the system picker, the
- * same way library folders are granted. A General MIDI bank is 30 to 150 MB, so
- * the file is NEVER read whole. What is read at open time is only the index -
+ * The app ships one small SoundFont and the user may pick another .sf2 with the
+ * system picker, the same way library folders are granted. A General MIDI bank is
+ * 30 to 150 MB, so the file is NEVER read whole. What is read at open time is only the index -
  * presets, instruments, zones, sample headers, a few hundred kilobytes - and the
  * sample data is pulled out on demand, for the handful of instruments a backing
  * track actually uses.

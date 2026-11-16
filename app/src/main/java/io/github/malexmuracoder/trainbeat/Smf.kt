@@ -55,7 +55,13 @@ class Score(
     val programs: List<ProgramChange>,
     val controllers: List<Controller>,
     val endTick: Int,
-    val title: String?
+    val title: String?,
+    /**
+     * Where each note is played on a fretboard, when the file says so. Only a
+     * MusicXML score written for a tablature has it; a MIDI file never does.
+     * It is not transposed with the notes: the tablature does that itself.
+     */
+    val tab: TabScore? = null
 ) {
     /** Channels that actually carry notes, in order. */
     val usedChannels: List<Int> by lazy { notes.map { it.channel }.distinct().sorted() }
@@ -184,11 +190,14 @@ class Score(
         controllers.filter { it.tick <= a }
             .groupBy { it.channel * 256 + it.number }.values.map { it.last() }
 
+    /** The same score with a click on every beat; see Metronome. */
+    fun withMetronome(): Score = copy(notes = (notes + Metronome.clicks(this)).sortedBy { it.tick })
+
     fun copy(
         notes: List<MidiNote> = this.notes,
         tempos: List<TempoPoint> = this.tempos,
         endTick: Int = this.endTick
-    ) = Score(ppq, notes, tempos, timeSignatures, keySignatures, programs, controllers, endTick, title)
+    ) = Score(ppq, notes, tempos, timeSignatures, keySignatures, programs, controllers, endTick, title, tab)
 
     companion object {
         const val DRUM_CHANNEL = 9

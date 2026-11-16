@@ -19,8 +19,8 @@ under tempo and let the piece carry you up to it.
 MIDI files are treated as what they are: scores. Changing the tempo is a
 multiplication and transposing is an addition, so both are exact - no stretching,
 no artefacts - and tempo, metre and key are read from the file rather than guessed
-at. To hear a score you choose a SoundFont (.sf2) once; the app ships none,
-because a General MIDI bank is 30 to 150 MB and belongs to whoever made it.
+at. A small SoundFont (Chaos Bank, CC0) is built in, and a few example loops come with
+the app; choose a SoundFont (.sf2) of your own once for a better sound.
 
 The library scans the folders you grant and remembers the tempo and key of every
 file, so nothing is analysed while you are trying to play. Any key can be

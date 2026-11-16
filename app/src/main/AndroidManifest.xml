@@ -57,6 +57,13 @@
                 <data android:mimeType="application/x-midi" />
                 <data android:mimeType="application/ogg" />
                 <data android:mimeType="application/x-ogg" />
+                <!-- MusicXML, which is a score like a MIDI file is: .musicxml, the
+                     zipped .mxl, and plain .xml, which many programs hand out as a
+                     generic XML type. The app says so plainly if it is not music. -->
+                <data android:mimeType="application/vnd.recordare.musicxml+xml" />
+                <data android:mimeType="application/vnd.recordare.musicxml" />
+                <data android:mimeType="application/xml" />
+                <data android:mimeType="text/xml" />
             </intent-filter>
 
             <!-- Shared to the app rather than opened by it, which is the same file
@@ -72,6 +79,10 @@
                 <data android:mimeType="application/midi" />
                 <data android:mimeType="application/x-midi" />
                 <data android:mimeType="application/ogg" />
+                <data android:mimeType="application/vnd.recordare.musicxml+xml" />
+                <data android:mimeType="application/vnd.recordare.musicxml" />
+                <data android:mimeType="application/xml" />
+                <data android:mimeType="text/xml" />
             </intent-filter>
 
             <!-- The case that made this worth doing: a .mid downloaded from a web

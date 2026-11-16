@@ -5,12 +5,12 @@ import android.content.Intent
 import android.net.Uri
 
 /**
- * The SoundFont the user chose.
+ * The SoundFont in use: the one the user chose, else the one built into the app.
  *
- * The app ships none, on purpose: a General MIDI bank is 30 to 150 MB, its licence
- * is somebody else's business, and F-Droid should not be asked to carry it. So the
- * user grants a .sf2 with the system picker, exactly as they grant a library
- * folder, and it is remembered across restarts.
+ * The app ships a small one (Chaos Bank, CC0, see BuiltIn) so that MIDI plays on
+ * a fresh install. A user who wants a better sound grants a .sf2 with the system
+ * picker, exactly as they grant a library folder; it is remembered across
+ * restarts and takes precedence. Clearing it goes back to the built-in one.
  *
  * The parsed index is kept open for the session, because opening it costs tens of
  * milliseconds and every rendered note needs it.
@@ -27,11 +27,12 @@ object SoundFontStore {
     fun uri(ctx: Context): String? =
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_URI, null)
 
-    fun isSet(ctx: Context): Boolean = uri(ctx) != null
+    /** True when there is something to play MIDI with: the user's file or the built-in one. */
+    fun isSet(ctx: Context): Boolean = uri(ctx) != null || BuiltIn.hasSoundFont(ctx)
 
     fun label(ctx: Context): String =
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_NAME, null)
-            ?: "not chosen yet"
+            ?: if (BuiltIn.hasSoundFont(ctx)) BuiltIn.SOUNDFONT_LABEL else "not chosen yet"
 
     fun remember(ctx: Context, picked: Uri, name: String) {
         try {
@@ -47,7 +48,7 @@ object SoundFontStore {
         closeOpen()
     }
 
-    /** Forgets the choice and releases the grant. The file itself is not touched. */
+    /** Forgets the choice (back to the built-in one) and releases the grant. The file is not touched. */
     fun clear(ctx: Context) {
         uri(ctx)?.let {
             try {
@@ -68,8 +69,8 @@ object SoundFontStore {
      * the message has to say what to do about it.
      */
     fun soundFont(ctx: Context): SoundFont {
-        val u = uri(ctx) ?: throw IllegalStateException(
-            "no SoundFont chosen: pick a .sf2 file under Folders to play MIDI")
+        val u = uri(ctx) ?: BuiltIn.soundFontUri(ctx) ?: throw IllegalStateException(
+            "no SoundFont available: pick a .sf2 file under Folders to play MIDI")
         val already = open
         if (already != null && openFor == u) return already
         closeOpen()

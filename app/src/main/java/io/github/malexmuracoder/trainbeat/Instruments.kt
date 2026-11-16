@@ -31,11 +31,20 @@ object Instruments {
         val label: String
     )
 
+    /**
+     * The metronome is not a channel of the score but it sits in the mixer like one,
+     * and for the same reason: it is something that sounds or does not. It is bit 16
+     * of the mask, which ALL does not include, so it starts switched off.
+     */
+    const val METRONOME = 16
+
     fun isOn(mask: Int, channel: Int): Boolean =
-        channel in 0..15 && (mask shr channel) and 1 == 1
+        channel in 0..METRONOME && (mask shr channel) and 1 == 1
 
     fun toggled(mask: Int, channel: Int): Int =
-        if (channel !in 0..15) mask else mask xor (1 shl channel)
+        if (channel !in 0..METRONOME) mask else mask xor (1 shl channel)
+
+    fun metronomeOn(mask: Int): Boolean = isOn(mask, METRONOME)
 
     fun maskOf(channels: Collection<Int>): Int {
         var m = 0

@@ -39,6 +39,21 @@ artefacts. TrainBeat reads the file, plays it with a SoundFont of your choosing,
 and reads tempo, metre and key from the file itself instead of estimating them.
 The drum channel is never transposed.
 
+**Reading a score.** A MIDI file can be shown as a staff instead of the info card, one
+part at a time, with a cursor that follows the music. It is a reading aid for
+practising, not an engraver: the rhythm is put on a grid of sixteenth notes, each
+staff carries one line of music, and a piano part gets the grand staff. The number
+of bars shown follows the width of the screen, the cursor walks through them and the
+staff turns the page as the last visible bar begins, and the size of the staff can be
+set (it starts out larger on a tablet). Tapping the staff or tablature shows it alone on the whole screen, on black
+(a tap there is play / pause; the back gesture or "< Back" leaves). A MusicXML file (`.musicxml`, `.mxl`, `.xml`)
+opens the same way, with repeats and voltas unrolled (a repeated section is played, and shown, twice, each ending on its own pass; D.C., D.S. and coda are not followed); a part that the file writes for a
+fretboard, with string and fret on every note, is shown as a tablature instead of a
+staff. Guitar Pro 3, 4 and 5 files (`.gp3`, `.gp4`, `.gp5`) open the same way,
+with the tablature the file itself holds (Guitar Pro 6 and 7 are another, packed format and are
+refused with a message; export them as `.gp5` or MusicXML). A tablature is never guessed: a MIDI file does not say which string a note is
+on, so it is only shown when the file does.
+
 **Files from anywhere.** Anything that can send an audio file or a score can send
 it here - a download, an attachment, a file manager - and it opens straight in the
 player. Such a file is borrowed, since the permission to read it belongs to the
@@ -49,7 +64,8 @@ plainly when there is nowhere to put one.
 exact rather than approximate: the notes of that channel are simply not played, so
 nothing is filtered and nothing is subtracted. Opening the mixer stops the loop, on
 purpose - the rendering has to be made again, and a silence the user asked for is
-better than one that happens to them.
+better than one that happens to them. The mixer also holds an optional metronome, a click
+on every beat that follows the tempo and the metre of the score; it starts switched off.
 
 **Library.** Grant a few folders and the app scans them once, storing tempo and key
 per file. Audio is analysed (spectral flux and an autocorrelated onset envelope for
@@ -63,11 +79,22 @@ stays adjustable for ever.
 
 ## The SoundFont
 
-The app ships none, on purpose. A General MIDI bank is 30 to 150 MB and belongs to
-whoever made it. To play MIDI, choose a `.sf2` file once under **Folders** and it is
-remembered. [FluidR3 GM](https://member.keymusician.com/Member/FluidR3_GM/index.html)
+The app carries a small one, Chaos Bank V1.9 (1999) by Seong-Jin Yun, so MIDI plays
+on a fresh install. It is distributed by rKhive under CC0 1.0
+([notice](https://rkhive.com/legal.html)); the file itself carries only the author's
+name in its metadata. A `.sf2` of your own, chosen once under **Folders**, takes
+precedence and is remembered; "Use built-in" goes back. For a fuller General MIDI
+sound, [FluidR3 GM](https://member.keymusician.com/Member/FluidR3_GM/index.html)
 is a common free choice — take the large "GM" file, not the small "GS" one, which
 holds only sound effects.
+
+## Built-in examples
+
+A few example loops (MIDI, MP3, WAV, Guitar Pro) come with the app, in `assets/builtin/`.
+They are copied once to the app's private storage, apart from the library folders,
+listed in the library with the tempo and key the author gives in `assets/builtin/loops.tsv`
+(nothing is measured at start; a score is only parsed), and can be removed there (and
+restored under **Folders**). Change a loop, change its line, raise `BuiltIn.VERSION`.
 
 ## Building
 
@@ -84,5 +111,12 @@ Services, no network access of any kind.
 ## Licence
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).
+
+The music notation font is Bravura, Copyright (c) 2015 Steinberg Media Technologies
+GmbH, used unmodified under the SIL Open Font License 1.1
+([app/src/main/assets/fonts/OFL-Bravura.txt](app/src/main/assets/fonts/OFL-Bravura.txt)).
+
+The built-in SoundFont, Chaos Bank V1.9 by Seong-Jin Yun, is under CC0 1.0 as stated by
+its distributor rKhive (https://rkhive.com/legal.html).
 
 Copyright (C) 2026 Alessandro Mura

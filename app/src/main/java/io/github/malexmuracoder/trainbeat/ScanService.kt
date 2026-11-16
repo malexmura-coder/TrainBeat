@@ -76,6 +76,8 @@ class ScanService : Service() {
             for (folder in LibraryFolders.load(this)) {
                 entries.addAll(DocTree.listAudio(this, Uri.parse(folder)))
             }
+            // the loops that come with the app are a root of their own
+            entries.addAll(BuiltIn.entries(this))
             // same file reachable from two roots: keep it once
             val unique = entries.distinctBy { TrackRecord.cacheKeyOf(it.name, it.size) }
             ScanState.reset(unique.size)
@@ -94,6 +96,11 @@ class ScanService : Service() {
                 ScanState.current = e.name
                 val t0 = System.currentTimeMillis()
                 val record = analyse(e)
+                if (record == null) {
+                    // an .xml that is not a score: somebody else's file, not a failure
+                    ScanState.skipped++
+                    continue
+                }
                 elapsed += System.currentTimeMillis() - t0
                 analysed++
                 ScanState.msPerFile = elapsed.toDouble() / analysed
@@ -118,48 +125,7 @@ class ScanService : Service() {
         }
     }
 
-    private fun analyse(e: DocTree.Entry): TrackRecord {
-        // A score needs no decoding and no estimation: parse it, read the tempo map
-        // and the key signature, done in milliseconds. This is why a MIDI library
-        // scans in seconds where an audio one takes minutes.
-        if (MidiFile.isMidi(e.name)) {
-            return try {
-                val score = MidiFile.loadScore(this, Uri.parse(e.uri))
-                val r = MidiAnalysis.analyse(score)
-                MidiFile.recordFor(e.name, e.size, e.uri, score, r)
-            } catch (t: Throwable) {
-                TrackRecord(
-                    name = e.name, size = e.size, uri = e.uri,
-                    kind = TrackRecord.KIND_MIDI,
-                    error = (t.message ?: t.javaClass.simpleName).take(200)
-                )
-            }
-        }
-        return try {
-            val clip = AudioLoader.loadForAnalysis(this, Uri.parse(e.uri))
-            val r = Analyzer.analyze(clip.samples, clip.channels, clip.sampleRate, clip.loopExact)
-            TrackRecord(
-                name = e.name,
-                size = e.size,
-                uri = e.uri,
-                sampleRate = clip.sampleRate,
-                channels = clip.channels,
-                durationMs = clip.fullMs,
-                bpm = r.bpm,
-                beats = r.beats,
-                bars = r.bars,
-                barsRemainder = r.barsRemainder,
-                keyProbs = r.keyProbs
-            )
-        } catch (t: Throwable) {
-            TrackRecord(
-                name = e.name,
-                size = e.size,
-                uri = e.uri,
-                error = (t.message ?: t.javaClass.simpleName).take(200)
-            )
-        }
-    }
+    private fun analyse(e: DocTree.Entry): TrackRecord? = analyseEntry(this, e)
 
     // --- notification plumbing ---
 
@@ -233,5 +199,56 @@ class ScanService : Service() {
             }
         } catch (_: Exception) {
         }
+    }
+}
+
+/**
+ * Measures one file: tempo and key, and what the library needs to show it.
+ *
+ * Here and not in the service, because two things do it: the scan, which runs as a
+ * service over the folders the user granted, and the pass at the start of the app
+ * that measures the loops shipped with it. Null for an .xml that is not a score.
+ */
+internal fun analyseEntry(ctx: Context, e: DocTree.Entry): TrackRecord? {
+    // A score needs no decoding and no estimation: parse it, read the tempo map
+    // and the key signature, done in milliseconds. This is why a MIDI library
+    // scans in seconds where an audio one takes minutes.
+    if (MidiFile.isMidi(e.name)) {
+        return try {
+            val score = MidiFile.loadScore(ctx, Uri.parse(e.uri), e.name)
+            val r = MidiAnalysis.analyse(score)
+            MidiFile.recordFor(e.name, e.size, e.uri, score, r)
+        } catch (t: Throwable) {
+            if (t is NotMusicXml && e.name.lowercase().endsWith(".xml")) return null
+            TrackRecord(
+                name = e.name, size = e.size, uri = e.uri,
+                kind = TrackRecord.KIND_MIDI,
+                error = (t.message ?: t.javaClass.simpleName).take(200)
+            )
+        }
+    }
+    return try {
+        val clip = AudioLoader.loadForAnalysis(ctx, Uri.parse(e.uri))
+        val r = Analyzer.analyze(clip.samples, clip.channels, clip.sampleRate, clip.loopExact)
+        TrackRecord(
+            name = e.name,
+            size = e.size,
+            uri = e.uri,
+            sampleRate = clip.sampleRate,
+            channels = clip.channels,
+            durationMs = clip.fullMs,
+            bpm = r.bpm,
+            beats = r.beats,
+            bars = r.bars,
+            barsRemainder = r.barsRemainder,
+            keyProbs = r.keyProbs
+        )
+    } catch (t: Throwable) {
+        TrackRecord(
+            name = e.name,
+            size = e.size,
+            uri = e.uri,
+            error = (t.message ?: t.javaClass.simpleName).take(200)
+        )
     }
 }

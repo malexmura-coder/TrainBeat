@@ -72,9 +72,11 @@ fun FoldersScreen(onBack: () -> Unit) {
     var recSet by remember { mutableStateOf(RecordFolder.isSet(ctx)) }
     var recLabel by remember { mutableStateOf(RecordFolder.label(ctx)) }
     var recMsg by remember { mutableStateOf("") }
-    var sfSet by remember { mutableStateOf(SoundFontStore.isSet(ctx)) }
+    var sfSet by remember { mutableStateOf(SoundFontStore.uri(ctx) != null) }
     var sfLabel by remember { mutableStateOf(SoundFontStore.label(ctx)) }
     var sfMsg by remember { mutableStateOf("") }
+    var exMsg by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
 
     val treePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         if (uri != null) {
@@ -300,8 +302,8 @@ fun FoldersScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(2.dp))
         Text(
             "Read only. A MIDI file says which notes to play, not how they sound: this " +
-                "is the bank of sounds used to hear it. The app ships none, because a " +
-                "General MIDI bank is 30 to 150 MB and belongs to whoever made it.",
+                "is the bank of sounds used to hear it. The app has a small one built in; " +
+                "choose your own .sf2 for a better sound, it takes precedence.",
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -315,7 +317,7 @@ fun FoldersScreen(onBack: () -> Unit) {
                     Button(
                         onClick = { sfPicker.launch(arrayOf("*/*")) },
                         modifier = Modifier.fillMaxWidth().height(46.dp)
-                    ) { Text("Choose a .sf2", fontSize = 15.sp) }
+                    ) { Text("Choose your own .sf2", fontSize = 15.sp) }
                 } else {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Button(
@@ -329,16 +331,46 @@ fun FoldersScreen(onBack: () -> Unit) {
                                 SoundFontStore.clear(ctx)
                                 sfSet = false
                                 sfLabel = SoundFontStore.label(ctx)
-                                sfMsg = "SoundFont forgotten, no file removed"
+                                sfMsg = "Back to the built-in SoundFont, no file removed"
                             },
                             modifier = Modifier.weight(1f).height(44.dp),
                             contentPadding = PaddingValues(horizontal = 4.dp)
-                        ) { Text("Clear", fontSize = 13.sp) }
+                        ) { Text("Use built-in", fontSize = 13.sp) }
                     }
                 }
                 if (sfMsg.isNotEmpty()) {
                     Spacer(Modifier.height(6.dp))
                     Text(sfMsg, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+        Text("Built-in examples", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(2.dp))
+        Text(
+            "The app comes with a few example loops and a SoundFont, kept in its own " +
+                "private space, apart from your folders. They are in the library until " +
+                "you remove them there. This brings back the ones you removed.",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(10.dp))
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(12.dp)) {
+                Button(
+                    onClick = {
+                        exMsg = "Restoring..."
+                        scope.launch {
+                            val n = withContext(Dispatchers.IO) { BuiltIn.restore(ctx) }
+                            exMsg = if (n == 0) "Nothing to restore" else "Restored $n example(s)"
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(46.dp)
+                ) { Text("Restore examples", fontSize = 15.sp) }
+                if (exMsg.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(exMsg, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                 }
             }
         }
@@ -377,6 +409,7 @@ fun ScanScreen(onBack: () -> Unit) {
         val res = withContext(Dispatchers.IO) {
             val entries = LibraryFolders.load(ctx)
                 .flatMap { DocTree.listAudio(ctx, Uri.parse(it)) }
+                .plus(BuiltIn.entries(ctx))
                 .distinctBy { TrackRecord.cacheKeyOf(it.name, it.size) }
             val known = LibraryFolders.store(ctx).loadMap()
             val analysed = entries.count {
@@ -509,6 +542,12 @@ fun LibraryScreen(onBack: () -> Unit, onOpen: (String, String) -> Unit) {
         records = records.map { if (it.cacheKey == rec.cacheKey) rec else it }
     }
 
+    fun removeBuiltIn(rec: TrackRecord) {
+        records = records.filter { it.cacheKey != rec.cacheKey }
+        starred = starred - rec.uri
+        io.launch { withContext(Dispatchers.IO) { BuiltIn.remove(ctx, rec) } }
+    }
+
     LaunchedEffect(Unit) {
         records = withContext(Dispatchers.IO) { LibraryFolders.store(ctx).loadAll() }
         starred = withContext(Dispatchers.IO) {
@@ -626,7 +665,8 @@ fun LibraryScreen(onBack: () -> Unit, onOpen: (String, String) -> Unit) {
                         onClearKey = { persist(r.copy(manualKey = null)) },
                         filterKey = key,
                         onSetFilterKey = { persist(r.copy(manualKey = key)) },
-                        score = if (key != null) row.score else null
+                        score = if (key != null) row.score else null,
+                        onRemove = if (BuiltIn.isBuiltIn(ctx, r.uri)) ({ removeBuiltIn(r) }) else null
                     )
                 }
             }
@@ -669,7 +709,9 @@ fun TrackRow(
     /** Extra lines under the row - the favourites use it for what is remembered. */
     extra: String? = null,
     /** A dead pointer: shown greyed, and tapping means forget rather than open. */
-    missing: Boolean = false
+    missing: Boolean = false,
+    /** Only for the examples that come with the app: takes the track out of the library. */
+    onRemove: (() -> Unit)? = null
 ) {
     val r = record
     Card(
@@ -745,6 +787,12 @@ fun TrackRow(
                         onClick = onClearKey,
                         contentPadding = PaddingValues(horizontal = 6.dp)
                     ) { Text("Clear", fontSize = 11.sp) }
+                }
+                if (onRemove != null) {
+                    TextButton(
+                        onClick = onRemove,
+                        contentPadding = PaddingValues(horizontal = 6.dp)
+                    ) { Text("Remove", fontSize = 11.sp) }
                 }
             }
 

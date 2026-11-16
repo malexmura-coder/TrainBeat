@@ -1,0 +1,18 @@
+# What the app knows about the loops that come with it, so that nothing has to be
+# measured when it starts. One line per file in loops/, tab separated:
+#   name, key, bpm, duration in ms, sample rate, channels, beats
+# The key is the one the author gives (names as in the library: C, Am, G#m ...).
+# A score (.mid, .gp3) has only the name and the key: tempo and length are read from
+# the file, which takes milliseconds, and the key here replaces the one it declares.
+# Beats is 0 for a track that is not a loop. A file that is not listed is measured.
+# When a loop is changed or added, change its line, and raise BuiltIn.VERSION.
+MIDI EXAMPLE BALLAD.mid	Am					
+MIDI EXAMPLE BOSSA.mid	C					
+MIDI EXAMPLE ROCK.mid	A					
+TAB EXAMPLE.gp3	Em					
+MP3 EXAMPLE BOSSA.mp3	C	110	35161	44100	2	64
+MP3 EXAMPLE GIPSY.mp3	Am	160	22700	44100	2	60
+MP3 EXAMPLE METAL.mp3	G#m	119.97	16039	44100	2	32
+MP3 EXAMPLE PROG METAL.mp3	Em	119.95	179096	44100	2	0
+MP3 EXAMPLE ROCK.mp3	Em	103.55	9273	44100	2	16
+WAV EXAMPLE FUNKY.wav	Em	120.53	15929	44100	2	32

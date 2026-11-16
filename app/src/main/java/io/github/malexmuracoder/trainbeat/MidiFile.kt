@@ -16,12 +16,37 @@ object MidiFile {
     /** Above this a file is not a score, it is somebody's mistake. */
     const val MAX_BYTES = 8 * 1024 * 1024
 
+    /**
+     * Whether a name is a SCORE: a MIDI file, MusicXML, or Guitar Pro 3-5. The name
+     * says "isMidi" for historical reasons; everything that is a Score is read,
+     * played, scanned and trimmed the same way whichever of the three it came from.
+     */
     fun isMidi(name: String): Boolean {
         val n = name.lowercase()
-        return n.endsWith(".mid") || n.endsWith(".midi") || n.endsWith(".kar")
+        return n.endsWith(".mid") || n.endsWith(".midi") || n.endsWith(".kar") ||
+            MusicXml.isMusicXmlName(n) || GuitarPro.isGuitarProName(n)
     }
 
-    fun loadScore(ctx: Context, uri: Uri): Score {
+    /**
+     * MIDI, Guitar Pro or MusicXML, told apart by the first bytes and, failing that,
+     * by the name.
+     */
+    fun parseScore(bytes: ByteArray, name: String? = null): Score {
+        val midi = bytes.size >= 4 && bytes[0] == 'M'.code.toByte() && bytes[1] == 'T'.code.toByte() &&
+            bytes[2] == 'h'.code.toByte() && bytes[3] == 'd'.code.toByte()
+        if (midi) return Smf.parse(bytes)
+        // Guitar Pro 3-5 begins with its own name; a file NAMED .gp3/.gp4/.gp5 that
+        // does not is refused by the reader with a message that says why
+        if (GuitarPro.looksLikeGuitarPro(bytes) || (name != null && GuitarPro.isGuitarProName(name))) {
+            return GuitarPro.parse(bytes)
+        }
+        val first = bytes.firstOrNull()?.toInt() ?: 0
+        val xmlLike = first == '<'.code || first == 'P'.code || first == 0xEF || first == 0xFE || first == 0xFF
+        val named = name != null && MusicXml.isMusicXmlName(name)
+        return if (named || xmlLike) MusicXml.parse(bytes) else Smf.parse(bytes)
+    }
+
+    fun loadScore(ctx: Context, uri: Uri, name: String? = null): Score {
         val bytes = ctx.contentResolver.openInputStream(uri)?.use { input ->
             val out = java.io.ByteArrayOutputStream()
             val buf = ByteArray(64 * 1024)
@@ -35,7 +60,7 @@ object MidiFile {
             }
             out.toByteArray()
         } ?: throw MalformedMidi("the file could not be opened")
-        return Smf.parse(bytes)
+        return parseScore(bytes, name)
     }
 
     /** What the info card shows for a score. */
